@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from sqladmin import Admin, ModelView
 
-from your_podcast.db.models import Post, PostComment
+from your_podcast.db.models import Episode, Post, PostComment
 from your_podcast.db.session import get_engine
 
 
@@ -55,6 +55,35 @@ class PostCommentAdmin(ModelView, model=PostComment):
     column_sortable_list = [PostComment.score, PostComment.depth]
 
 
+class EpisodeAdmin(ModelView, model=Episode):
+    """Admin view for Episode model."""
+
+    name = "Episode"
+    name_plural = "Episodes"
+    icon = "fa-solid fa-podcast"
+
+    column_list = [
+        Episode.id,
+        Episode.title,
+        Episode.post_count,
+        Episode.duration_seconds,
+        Episode.created_at,
+    ]
+    column_details_list = [
+        Episode.id,
+        Episode.title,
+        Episode.description,
+        Episode.transcript_path,
+        Episode.audio_path,
+        Episode.post_count,
+        Episode.duration_seconds,
+        Episode.created_at,
+    ]
+    column_searchable_list = [Episode.title, Episode.description]
+    column_sortable_list = [Episode.post_count, Episode.created_at]
+    column_default_sort = [(Episode.created_at, True)]
+
+
 def create_app() -> FastAPI:
     """Create FastAPI app with SQLAdmin."""
     app = FastAPI(title="Your Podcast Admin")
@@ -65,5 +94,6 @@ def create_app() -> FastAPI:
     # Add views
     admin.add_view(PostAdmin)
     admin.add_view(PostCommentAdmin)
+    admin.add_view(EpisodeAdmin)
 
     return app

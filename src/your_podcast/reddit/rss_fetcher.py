@@ -28,8 +28,9 @@ def fetch_subreddit_rss(
     settings = get_settings()
 
     # Build RSS URL
-    if sort == "top":
-        url = f"https://www.reddit.com/r/{subreddit_name}/top/.rss?t={time_filter}"
+    # Sorts: hot, new, top, rising, controversial
+    if sort in ("top", "controversial"):
+        url = f"https://www.reddit.com/r/{subreddit_name}/{sort}/.rss?t={time_filter}"
     else:
         url = f"https://www.reddit.com/r/{subreddit_name}/{sort}/.rss"
 

@@ -62,3 +62,22 @@ class PostComment(Base):
     post: Mapped["Post"] = relationship(back_populates="comments")
 
     __table_args__ = (Index("ix_post_comments_post_id", "post_id"),)
+
+
+class Episode(Base):
+    """Generated podcast episode."""
+
+    __tablename__ = "episodes"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    transcript_path: Mapped[str] = mapped_column(Text, nullable=False)
+    audio_path: Mapped[str] = mapped_column(Text, nullable=False)
+    duration_seconds: Mapped[int | None] = mapped_column(Integer)
+    post_count: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

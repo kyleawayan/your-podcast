@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     reddit_redirect_uri: str = "http://localhost:8080/callback"
     token_encryption_key: str = ""
 
+    # Podcast generation with Podcastfy
+    anthropic_api_key: str = ""  # For transcript generation with Claude
+    elevenlabs_api_key: str = ""  # For TTS audio generation
+
 
 @lru_cache
 def get_settings() -> Settings:
