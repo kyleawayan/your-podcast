@@ -147,14 +147,19 @@ def generate_episode(
     }
 
     # Generate podcast using Podcastfy
+    mode_str = "longform" if word_count > 500 else "standard"
     console.print(
         f"[yellow]Generating ~{word_count // 150} minute podcast "
-        f"with Podcastfy + ElevenLabs...[/yellow]"
+        f"with Podcastfy + ElevenLabs ({mode_str} mode)...[/yellow]"
     )
 
     # Find latest transcript before generation to detect the new one
     transcript_dir = Path("./data/transcripts")
     existing_transcripts = set(transcript_dir.glob("transcript_*.txt")) if transcript_dir.exists() else set()
+
+    # Use longform mode for longer podcasts to avoid truncation
+    # Longform chunks content and generates in parts, then stitches together
+    use_longform = word_count > 500
 
     audio_path = generate_podcast(
         text=text_input,
@@ -162,6 +167,7 @@ def generate_episode(
         llm_model_name="anthropic/claude-sonnet-4-5",
         api_key_label="ANTHROPIC_API_KEY",
         conversation_config=conversation_config,
+        longform=use_longform,
     )
 
     # Find the newly created transcript
