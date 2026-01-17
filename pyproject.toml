@@ -1,0 +1,34 @@
+[project]
+name = "your-podcast"
+version = "0.1.0"
+description = "Generate personalized podcasts from Reddit content"
+requires-python = ">=3.12"
+dependencies = [
+    "feedparser",
+    "sqlalchemy>=2.0",
+    "psycopg2-binary",
+    "alembic",
+    "pydantic-settings",
+    "typer",
+    "rich",
+    "sqladmin[full]",
+    "fastapi",
+    "uvicorn",
+]
+
+[project.scripts]
+your-podcast = "your_podcast.cli.main:app"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/your_podcast"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
