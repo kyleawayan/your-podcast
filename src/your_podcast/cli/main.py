@@ -66,7 +66,7 @@ def log_generation(
         if not file_exists:
             writer.writeheader()
         writer.writerow(row)
-from your_podcast.reddit.rss_fetcher import fetch_and_save_subreddit_rss
+from your_podcast.reddit.json_fetcher import adaptive_delay, fetch_and_save_subreddit_json
 
 app = typer.Typer(
     name="your-podcast",
@@ -85,11 +85,15 @@ def fetch(
     time_filter: str = typer.Option(
         "day", "--time", "-t", help="Time filter for top posts (hour, day, week, month, year, all)"
     ),
+    limit: int = typer.Option(25, "--limit", "-l", help="Posts per subreddit (max 100)"),
+    comment_limit: int = typer.Option(10, "--comments", "-c", help="Comments per post"),
 ) -> None:
-    """Fetch posts from Reddit subreddits via RSS."""
+    """Fetch posts and comments from Reddit subreddits via JSON API."""
     console.print(f"[bold]Fetching from {len(subreddits)} subreddit(s)...[/bold]")
 
     total_posts = 0
+    total_comments = 0
+    last_response = None
 
     with get_session() as session:
         with Progress(
@@ -97,29 +101,41 @@ def fetch(
             TextColumn("[progress.description]{task.description}"),
             console=console,
         ) as progress:
-            for subreddit in subreddits:
+            for i, subreddit in enumerate(subreddits):
+                # Wait between subreddits (adaptive rate limiting)
+                if last_response and i > 0:
+                    delay = adaptive_delay(last_response, base_delay=1.0)
+                    time.sleep(delay)
+
                 # Normalize subreddit name
                 name = subreddit.lower().removeprefix("r/")
-                task = progress.add_task(f"r/{name}", total=None)
+                task = progress.add_task(f"r/{name}: starting...", total=None)
+
+                def update_progress(status: str) -> None:
+                    progress.update(task, description=f"r/{name}: {status}")
 
                 try:
-                    new_posts = fetch_and_save_subreddit_rss(
+                    new_posts, new_comments, last_response = fetch_and_save_subreddit_json(
                         session=session,
                         subreddit_name=name,
                         sort=sort,
                         time_filter=time_filter,
+                        post_limit=limit,
+                        comment_limit=comment_limit,
+                        on_progress=update_progress,
                     )
                     total_posts += new_posts
+                    total_comments += new_comments
                     progress.update(
                         task,
-                        description=f"r/{name} [green]✓[/green] ({new_posts} new posts)",
+                        description=f"r/{name} [green]✓[/green] ({new_posts} posts, {new_comments} comments)",
                     )
                 except Exception as e:
                     progress.update(task, description=f"r/{name} [red]✗[/red] {e}")
 
                 progress.update(task, completed=True)
 
-    console.print(f"\n[green]Done![/green] Fetched {total_posts} new posts.")
+    console.print(f"\n[green]Done![/green] Fetched {total_posts} new posts with {total_comments} comments.")
 
 
 @app.command()
@@ -186,18 +202,17 @@ def generate(
     output_dir: str = typer.Option(
         "./data/podcasts", "--output", "-o", help="Output directory for podcast files"
     ),
-    no_smart_fetch: bool = typer.Option(
-        False, "--no-smart-fetch", help="Disable Claude analysis and URL fetching"
-    ),
     word_count: int = typer.Option(
         500, "--words", "-w", help="Target word count (~150 words = 1 min audio)"
+    ),
+    by_engagement: bool = typer.Option(
+        False, "--by-engagement", help="Select top posts by engagement (score + comments)"
     ),
 ) -> None:
     """Generate a podcast episode from fetched Reddit posts.
 
-    Uses Claude to analyze posts and intelligently fetch full article content
-    for "juicy" posts. All posts are included, but only interesting ones get
-    deep-dived with full URL content. Disable with --no-smart-fetch for faster generation.
+    Selects unused posts (random by default, or top by engagement with --by-engagement)
+    and generates a podcast with Podcastfy. Posts are marked as used after generation.
 
     Default is ~3.5 minutes. Use --words 750 for ~5 minutes.
     """
@@ -211,8 +226,8 @@ def generate(
                 limit=limit,
                 subreddits=subreddits,
                 output_dir=output_dir,
-                use_smart_fetching=not no_smart_fetch,
                 word_count=word_count,
+                sort_by_score=by_engagement,
             )
             render_seconds = time.time() - start_time
 

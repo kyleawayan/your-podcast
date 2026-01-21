@@ -2,9 +2,10 @@
 
 import uuid
 from datetime import datetime
+from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
@@ -34,34 +35,15 @@ class Post(Base):
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-
-    # Relationships
-    comments: Mapped[list["PostComment"]] = relationship(
-        back_populates="post", cascade="all, delete-orphan"
+    # Comments stored as JSON array: [{"author": "...", "body": "...", "score": 0}, ...]
+    comments: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSONB, default=list, server_default="[]"
     )
-
-
-class PostComment(Base):
-    """Comments on a Reddit post - for future API support."""
-
-    __tablename__ = "post_comments"
-
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    # Track which episode this post was used in (null = not yet used)
+    episode_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("episodes.id"), nullable=True, index=True
     )
-    post_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("posts.id", ondelete="CASCADE"), nullable=False
-    )
-    reddit_id: Mapped[str] = mapped_column(String(20), nullable=False)
-    author: Mapped[str | None] = mapped_column(String(255))
-    body: Mapped[str] = mapped_column(Text, nullable=False)
-    score: Mapped[int] = mapped_column(Integer, default=0)
-    depth: Mapped[int] = mapped_column(Integer, default=0)
-
-    # Relationships
-    post: Mapped["Post"] = relationship(back_populates="comments")
-
-    __table_args__ = (Index("ix_post_comments_post_id", "post_id"),)
+    episode: Mapped["Episode | None"] = relationship("Episode", back_populates="posts")
 
 
 class Episode(Base):
@@ -81,3 +63,5 @@ class Episode(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    # Posts used in this episode
+    posts: Mapped[list["Post"]] = relationship("Post", back_populates="episode")

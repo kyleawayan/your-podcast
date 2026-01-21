@@ -1,5 +1,7 @@
 """Podcast episode generator using Podcastfy."""
 
+import random
+
 import os
 from pathlib import Path
 
@@ -8,8 +10,7 @@ from rich.console import Console
 from sqlalchemy.orm import Session
 
 from your_podcast.db.models import Episode, Post
-from your_podcast.podcast.analyzer import filter_and_score_posts
-from your_podcast.reddit.comment_fetcher import fetch_comments, format_post_with_comments
+from your_podcast.reddit.comment_fetcher import format_post_with_comments
 from your_podcast.settings import get_settings
 
 console = Console()
@@ -20,23 +21,22 @@ def generate_episode(
     limit: int = 10,
     subreddits: list[str] | None = None,
     output_dir: str = "./data/podcasts",
-    use_smart_fetching: bool = True,
     word_count: int = 500,
+    sort_by_score: bool = False,
 ) -> Episode:
     """
     Generate a podcast episode from fetched Reddit posts.
 
-    Uses Claude to analyze posts and intelligently fetch full URL content
-    for "juicy" posts. All posts are included in the podcast, but Claude
-    determines which ones are worth fetching full article content for.
+    Selects posts from the database and generates a podcast with Podcastfy.
+    All posts include their top comments.
 
     Args:
         session: Database session
         limit: Maximum number of posts to include in podcast
         subreddits: Optional list of subreddits to filter by
         output_dir: Directory to save audio and transcript files
-        use_smart_fetching: If True, use Claude to analyze and fetch URLs for interesting posts
         word_count: Target word count for podcast transcript (~150 words = 1 min audio)
+        sort_by_score: If True, select top posts by engagement (score + comments); otherwise random
 
     Returns:
         Episode: Created episode record with paths to generated files
@@ -47,73 +47,40 @@ def generate_episode(
     os.environ["ANTHROPIC_API_KEY"] = settings.anthropic_api_key
     os.environ["ELEVENLABS_API_KEY"] = settings.elevenlabs_api_key
 
-    # Query posts from database
-    query = session.query(Post).order_by(Post.score.desc(), Post.created_utc.desc())
+    # Query unused posts (not yet in an episode)
+    query = session.query(Post).filter(Post.episode_id.is_(None))
 
     if subreddits:
         query = query.filter(Post.subreddit.in_(subreddits))
 
-    candidate_posts = query.limit(limit).all()
-
-    if not candidate_posts:
-        raise ValueError("No posts found to generate podcast from")
-
-    posts = candidate_posts
-
-    # Analyze posts to decide which ones to deep-dive
-    if use_smart_fetching:
-        console.print("[yellow]Analyzing posts with Claude to identify deep-dive candidates...[/yellow]")
-        # Analyze posts but don't filter them out
-        scored_posts = filter_and_score_posts(posts, min_score=0)  # min_score=0 to keep all
-
-        # Create a map of post to analysis
-        post_analysis_map = {post: analysis for post, analysis in scored_posts}
-
-        content_parts = []
-        posts_with_comments = 0
-
-        for post in posts:
-            analysis = post_analysis_map.get(post, {"score": 0, "should_fetch_url": False, "reasoning": "No analysis"})
-
-            # For juicy posts, fetch comments via JSON API
-            if analysis["should_fetch_url"]:
-                comments = fetch_comments(post.url, limit=10)
-                post_text = format_post_with_comments(
-                    title=post.title,
-                    subreddit=post.subreddit,
-                    author=post.author or "unknown",
-                    content=post.content or "",
-                    comments=comments,
-                    max_comments=5,
-                )
-                posts_with_comments += 1
-                console.print(
-                    f"  • {post.title[:60]}... "
-                    f"[cyan](score: {analysis['score']}/10, "
-                    f"{len(comments)} comments)[/cyan]"
-                )
-            else:
-                # Use RSS content directly (no comments)
-                post_text = f"**{post.title}**\n"
-                post_text += f"From r/{post.subreddit} by {post.author or 'unknown'}\n"
-                if post.content:
-                    post_text += f"{post.content}\n"
-                console.print(
-                    f"  • {post.title[:60]}... "
-                    f"[cyan](score: {analysis['score']}/10)[/cyan]"
-                )
-            content_parts.append(post_text)
+    if sort_by_score:
+        # Get top posts by engagement (score + comments)
+        posts = query.order_by((Post.score + Post.num_comments).desc()).limit(limit).all()
+        if not posts:
+            raise ValueError("No unused posts found to generate podcast from")
+        console.print(f"[yellow]Selected top {len(posts)} posts by engagement...[/yellow]")
     else:
-        # Simple mode: no analysis, use RSS content for all posts
-        content_parts = []
-        posts_with_comments = 0
+        # Fetch extra for random selection
+        candidate_posts = query.limit(limit * 3).all()
+        if not candidate_posts:
+            raise ValueError("No unused posts found to generate podcast from")
+        posts = random.sample(candidate_posts, min(limit, len(candidate_posts)))
+        console.print(f"[yellow]Selected {len(posts)} random posts from {len(candidate_posts)} available...[/yellow]")
 
-        for post in posts:
-            post_text = f"**{post.title}**\n"
-            post_text += f"From r/{post.subreddit} by {post.author or 'unknown'}\n"
-            if post.content:
-                post_text += f"{post.content}\n"
-            content_parts.append(post_text)
+    # Format all posts with their comments
+    content_parts = []
+    for post in posts:
+        comments = post.comments or []
+        post_text = format_post_with_comments(
+            title=post.title,
+            subreddit=post.subreddit,
+            author=post.author or "unknown",
+            content=post.content or "",
+            comments=comments,
+            max_comments=5,
+        )
+        console.print(f"  • {post.title[:60]}... [cyan]({len(comments)} comments)[/cyan]")
+        content_parts.append(post_text)
 
     # Create output directory
     output_path = Path(output_dir)
@@ -123,10 +90,7 @@ def generate_episode(
     text_input = "\n---\n\n".join(content_parts)
 
     # Log what we're doing
-    console.print(
-        f"[yellow]Prepared {len(content_parts)} posts "
-        f"({posts_with_comments} with comments)...[/yellow]"
-    )
+    console.print(f"[yellow]Prepared {len(content_parts)} posts for podcast...[/yellow]")
 
     # Configure podcast conversation with custom ElevenLabs voices
     # Models: eleven_multilingual_v2 (high quality), eleven_turbo_v2_5 (faster)
@@ -207,6 +171,12 @@ def generate_episode(
     )
 
     session.add(episode)
+    session.flush()  # Get episode ID without committing
+
+    # Mark posts as used in this episode
+    for post in posts:
+        post.episode_id = episode.id
+
     session.commit()
     session.refresh(episode)
 

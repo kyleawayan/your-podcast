@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from sqladmin import Admin, ModelView
 
-from your_podcast.db.models import Episode, Post, PostComment
+from your_podcast.db.models import Episode, Post
 from your_podcast.db.session import get_engine
 
 
@@ -34,25 +34,6 @@ class PostAdmin(ModelView, model=Post):
         Post.fetched_at,
     ]
     column_default_sort = [(Post.fetched_at, True)]  # Sort by fetched_at desc
-
-
-class PostCommentAdmin(ModelView, model=PostComment):
-    """Admin view for PostComment model."""
-
-    name = "Comment"
-    name_plural = "Comments"
-    icon = "fa-solid fa-comment"
-
-    column_list = [
-        PostComment.id,
-        PostComment.post_id,
-        PostComment.author,
-        PostComment.body,
-        PostComment.score,
-        PostComment.depth,
-    ]
-    column_searchable_list = [PostComment.author, PostComment.body]
-    column_sortable_list = [PostComment.score, PostComment.depth]
 
 
 class EpisodeAdmin(ModelView, model=Episode):
@@ -93,7 +74,6 @@ def create_app() -> FastAPI:
 
     # Add views
     admin.add_view(PostAdmin)
-    admin.add_view(PostCommentAdmin)
     admin.add_view(EpisodeAdmin)
 
     return app
