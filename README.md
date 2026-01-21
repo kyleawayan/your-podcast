@@ -9,16 +9,22 @@ See the initial plan as of 2026-01-14 at [`docs/reddit-podcast-generator-plan.md
 ```bash
 # 1. Set the environment variables in .env.example
 
-# 2. Start the database
+# 2. Install dependencies
+uv sync
+
+# 3. Start the database
 docker compose up -d
 
-# 3. Fetch Reddit subreddits
+# 4. Run migrations
+uv run alembic upgrade head
+
+# 5. Fetch Reddit subreddits
 uv run your-podcast fetch python rust programming
 
-# 4. Generate a podcast (this will take a while)
+# 6. Generate a podcast (this will take a while)
 uv run your-podcast generate
 
-# 5. Generate a longer podcast
+# 7. Generate a longer podcast
 uv run your-podcast generate --limit 15 --words 1000
 ```
 
