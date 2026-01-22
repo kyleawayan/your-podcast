@@ -24,6 +24,15 @@ class Settings(BaseSettings):
     anthropic_api_key: str = ""  # For transcript generation with Claude
     elevenlabs_api_key: str = ""  # For TTS audio generation
 
+    # TTS backend: "elevenlabs" or "macos"
+    tts_backend: str = "elevenlabs"
+
+    # macOS TTS voices (Premium/Siri voices recommended)
+    # Install via: System Settings > Accessibility > Spoken Content > System Voice > Manage Voices
+    # Or on Sequoia+: VoiceOver Utility > Speech
+    macos_voice_1: str = "Ava (Premium)"  # Person1 (host asking questions)
+    macos_voice_2: str = "Zoe (Premium)"  # Person2 (host answering)
+
 
 @lru_cache
 def get_settings() -> Settings:
