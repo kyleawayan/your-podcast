@@ -215,6 +215,9 @@ def generate(
     by_engagement: bool = typer.Option(
         False, "--by-engagement", help="Select top posts by engagement (score + comments)"
     ),
+    tts: str = typer.Option(
+        None, "--tts", help="TTS backend: 'elevenlabs' or 'macos' (default from settings)"
+    ),
 ) -> None:
     """Generate a podcast episode from fetched Reddit posts.
 
@@ -222,6 +225,8 @@ def generate(
     and generates a podcast with Podcastfy. Posts are marked as used after generation.
 
     Default is ~3.5 minutes. Use --words 750 for ~5 minutes.
+
+    Use --tts macos to use free macOS Premium/Siri voices instead of ElevenLabs.
     """
     console.print("[bold]Generating podcast episode...[/bold]")
     start_time = time.time()
@@ -235,6 +240,7 @@ def generate(
                 output_dir=output_dir,
                 word_count=word_count,
                 sort_by_score=by_engagement,
+                tts_backend=tts,
             )
             render_seconds = time.time() - start_time
 
@@ -247,12 +253,14 @@ def generate(
             console.print(f"  Render time: {render_seconds:.1f}s")
 
             # Log stats for optimization tracking
+            from your_podcast.settings import get_settings
+            effective_tts = tts or get_settings().tts_backend
             log_generation(
                 post_count=episode.post_count,
                 word_count=word_count,
                 render_seconds=render_seconds,
                 llm_model="claude-sonnet-4-5",
-                tts_model="eleven_multilingual_v2",
+                tts_model="macos_say" if effective_tts == "macos" else "eleven_multilingual_v2",
             )
 
         except ValueError as e:
