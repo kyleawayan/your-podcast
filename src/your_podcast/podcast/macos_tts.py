@@ -1,5 +1,6 @@
 """macOS text-to-speech using the `say` command with Premium/Siri voices."""
 
+import random
 import re
 import subprocess
 import tempfile
@@ -29,12 +30,37 @@ def parse_transcript(transcript: str) -> list[tuple[int, str]]:
     return segments
 
 
+def get_pause_duration(text: str) -> int:
+    """Determine pause duration (ms) based on how a segment ends.
+
+    Returns a contextually appropriate pause:
+    - Questions: longer pause (thinking/processing time)
+    - Ellipsis: medium-long pause (trailing off)
+    - Exclamations: shorter pause (energetic continuation)
+    - Statements: medium pause with slight variation
+    """
+    text = text.strip().rstrip('"\'')  # Remove trailing quotes
+
+    if text.endswith("?"):
+        # Questions need thinking time - 500-800ms
+        return random.randint(500, 800)
+    elif text.endswith("..."):
+        # Trailing off - 400-600ms
+        return random.randint(400, 600)
+    elif text.endswith("!"):
+        # Energetic - quick response 200-350ms
+        return random.randint(200, 350)
+    else:
+        # Normal statement - 300-500ms with variation
+        return random.randint(300, 500)
+
+
 def generate_audio_macos(
     transcript: str,
     voice_1: str,
     voice_2: str,
     output_path: str,
-    rate: int = 180,
+    rate: int = 165,
 ) -> str:
     """Generate podcast audio using macOS `say` command.
 
@@ -43,7 +69,7 @@ def generate_audio_macos(
         voice_1: macOS voice name for Person1 (e.g., "Ava (Premium)").
         voice_2: macOS voice name for Person2 (e.g., "Zoe (Premium)").
         output_path: Path to save the final combined audio file (.aiff).
-        rate: Speech rate in words per minute (default 180).
+        rate: Speech rate in words per minute (default 165).
 
     Returns:
         Path to the generated audio file.
@@ -85,10 +111,14 @@ def generate_audio_macos(
             if (i + 1) % 10 == 0:
                 console.print(f"  [dim]Processed {i + 1}/{len(segments)} segments...[/dim]")
 
-    # Concatenate all segments
-    console.print("[yellow]Concatenating audio segments...[/yellow]")
+    # Concatenate segments with context-aware pauses between them
+    console.print("[yellow]Concatenating audio segments with natural pauses...[/yellow]")
     combined = audio_segments[0]
-    for seg in audio_segments[1:]:
+    for i, seg in enumerate(audio_segments[1:]):
+        # Add pause based on how previous segment ended
+        prev_text = segments[i][1]  # i is offset by 1 due to slicing
+        pause_ms = get_pause_duration(prev_text)
+        combined += AudioSegment.silent(duration=pause_ms)
         combined += seg
 
     # Export as mp3
