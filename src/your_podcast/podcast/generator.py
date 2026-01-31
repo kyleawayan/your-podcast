@@ -155,8 +155,12 @@ def generate_episode(
             f"with Podcastfy + macOS voices...[/yellow]"
         )
 
+        # Find latest transcript before generation to detect the new one
+        transcript_dir = Path("./data/transcripts")
+        existing_transcripts = set(transcript_dir.glob("transcript_*.txt")) if transcript_dir.exists() else set()
+
         # Generate transcript only (no TTS) using Podcastfy + Claude
-        transcript_text = generate_podcast(
+        generate_podcast(
             text=text_input,
             tts_model="elevenlabs",
             llm_model_name="anthropic/claude-sonnet-4-5",
@@ -165,19 +169,23 @@ def generate_episode(
             transcript_only=True,
         )
 
-        if not transcript_text:
-            raise ValueError("Podcast generation failed - no transcript produced")
+        # Find the newly created transcript (Podcastfy saves it automatically)
+        transcript_path = ""
+        if transcript_dir.exists():
+            new_transcripts = set(transcript_dir.glob("transcript_*.txt")) - existing_transcripts
+            if new_transcripts:
+                transcript_path = str(max(new_transcripts, key=lambda p: p.stat().st_mtime).resolve())
 
-        # Save transcript
-        transcript_dir = Path("./data/transcripts")
-        transcript_dir.mkdir(parents=True, exist_ok=True)
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        transcript_path = str((transcript_dir / f"transcript_{timestamp}.txt").resolve())
-        Path(transcript_path).write_text(transcript_text)
+        if not transcript_path:
+            raise ValueError("Podcast generation failed - no transcript file produced")
+
+        # Read the transcript content
+        transcript_text = Path(transcript_path).read_text()
 
         # Generate audio with macOS say command
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         audio_file = str(output_path / f"podcast_{timestamp}.mp3")
 
         audio_path = generate_audio_macos(
