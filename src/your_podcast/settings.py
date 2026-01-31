@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     macos_voice_1: str = "Zoe (Premium)"  # Person1 (host asking questions)
     macos_voice_2: str = "Lee (Premium)"  # Person2 (host answering)
 
+    # Chatterbox TTS (local neural TTS, requires ~10s reference audio files)
+    # Place reference audio in ./data/voices/
+    chatterbox_voice_1: str = "./data/voices/person1.wav"  # Person1 reference audio
+    chatterbox_voice_2: str = "./data/voices/person2.wav"  # Person2 reference audio
+
 
 @lru_cache
 def get_settings() -> Settings:

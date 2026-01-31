@@ -11,6 +11,7 @@ from rich.console import Console
 from sqlalchemy.orm import Session
 
 from your_podcast.db.models import Episode, Post
+from your_podcast.podcast.chatterbox_tts import generate_audio_chatterbox
 from your_podcast.podcast.macos_tts import generate_audio_macos
 from your_podcast.reddit.comment_fetcher import format_post_with_comments
 from your_podcast.settings import get_settings
@@ -206,8 +207,46 @@ def generate_episode(
             output_path=audio_file,
         )
 
+    elif tts_backend == "chatterbox":
+        console.print(
+            f"[yellow]Generating ~{word_count // 150} minute podcast "
+            f"with Podcastfy + Chatterbox-Turbo...[/yellow]"
+        )
+
+        existing_transcripts = _get_existing_transcripts()
+
+        # Generate transcript only (no TTS) using Podcastfy + Claude
+        generate_podcast(
+            text=text_input,
+            tts_model="elevenlabs",
+            llm_model_name="anthropic/claude-sonnet-4-5",
+            api_key_label="ANTHROPIC_API_KEY",
+            conversation_config=conversation_config,
+            transcript_only=True,
+        )
+
+        transcript_path = _find_new_transcript(existing_transcripts)
+        if not transcript_path:
+            raise ValueError("Podcast generation failed - no transcript file produced")
+
+        # Read the transcript content
+        transcript_text = Path(transcript_path).read_text()
+
+        # Generate audio with Chatterbox-Turbo
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        audio_file = str(output_path / f"podcast_{timestamp}.mp3")
+
+        audio_path = generate_audio_chatterbox(
+            transcript=transcript_text,
+            voice_1_ref=settings.chatterbox_voice_1,
+            voice_2_ref=settings.chatterbox_voice_2,
+            output_path=audio_file,
+        )
+
     else:
-        raise ValueError(f"Unknown TTS backend: {tts_backend}. Use 'elevenlabs' or 'macos'.")
+        raise ValueError(f"Unknown TTS backend: {tts_backend}. Use 'elevenlabs', 'macos', or 'chatterbox'.")
 
     # Resolve audio path to absolute
     audio_path = str(Path(audio_path).resolve())

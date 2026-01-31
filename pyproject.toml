@@ -2,7 +2,7 @@
 name = "your-podcast"
 version = "0.1.0"
 description = "Generate personalized podcasts from Reddit content"
-requires-python = ">=3.12"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "sqlalchemy>=2.0",
     "psycopg2-binary",
@@ -17,6 +17,7 @@ dependencies = [
     "pydub",
     "playwright>=1.57.0",
     "anthropic>=0.76.0",
+    "chatterbox-tts>=0.1.6",
 ]
 
 [project.scripts]
@@ -35,3 +36,11 @@ target-version = "py312"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
+
+[tool.uv]
+# chatterbox-tts 0.1.6 requires numpy<1.26, but podcastfy requires pandas>=2.2.3
+# which needs numpy>=1.26. Chatterbox works fine with newer numpy despite its constraint.
+override-dependencies = ["numpy>=1.26.0"]
+
+[tool.uv.extra-build-dependencies]
+pkuseg = ["numpy"]

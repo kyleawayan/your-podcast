@@ -10,6 +10,7 @@ from your_podcast.podcast.macos_tts import (
     get_pause_duration,
     parse_transcript,
 )
+from your_podcast.podcast.chatterbox_tts import generate_audio_chatterbox
 from your_podcast.settings import get_settings
 
 console = Console()
@@ -102,6 +103,37 @@ def test_elevenlabs_voices() -> Path | None:
     return output_path
 
 
+def test_chatterbox_voices() -> Path | None:
+    """Generate test audio using Chatterbox-Turbo TTS."""
+    settings = get_settings()
+
+    # Check if reference audio files exist
+    voice_1_path = Path(settings.chatterbox_voice_1)
+    voice_2_path = Path(settings.chatterbox_voice_2)
+
+    if not voice_1_path.exists() or not voice_2_path.exists():
+        console.print(
+            "[yellow]Skipping Chatterbox test - reference audio files not found[/yellow]"
+        )
+        console.print(f"  Expected: {settings.chatterbox_voice_1}")
+        console.print(f"  Expected: {settings.chatterbox_voice_2}")
+        return None
+
+    transcript = TEST_TRANSCRIPT.read_text()
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = OUTPUT_DIR / "test_chatterbox.mp3"
+
+    console.print("[bold]Testing Chatterbox-Turbo TTS...[/bold]")
+    generate_audio_chatterbox(
+        transcript=transcript,
+        voice_1_ref=str(voice_1_path),
+        voice_2_ref=str(voice_2_path),
+        output_path=str(output_path),
+    )
+    return output_path
+
+
 def run_all_tests() -> dict[str, Path | None]:
     """Run all voice tests and return paths to generated files."""
     results: dict[str, Path | None] = {}
@@ -119,5 +151,12 @@ def run_all_tests() -> dict[str, Path | None]:
     except Exception as e:
         console.print(f"[red]ElevenLabs test failed:[/red] {e}")
         results["elevenlabs"] = None
+
+    # Chatterbox test
+    try:
+        results["chatterbox"] = test_chatterbox_voices()
+    except Exception as e:
+        console.print(f"[red]Chatterbox test failed:[/red] {e}")
+        results["chatterbox"] = None
 
     return results
