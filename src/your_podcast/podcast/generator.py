@@ -87,8 +87,8 @@ def generate_episode(
         query = query.filter(Post.subreddit.in_(subreddits))
 
     if sort_by_score:
-        # Get top posts by engagement (score + comments)
-        posts = query.order_by((Post.score + Post.num_comments).desc()).limit(limit).all()
+        # Get top posts by score
+        posts = query.order_by(Post.score.desc()).limit(limit).all()
         if not posts:
             raise ValueError("No unused posts found to generate podcast from")
         console.print(f"[yellow]Selected top {len(posts)} posts by engagement...[/yellow]")

@@ -30,7 +30,6 @@ class Post(Base):
     url: Mapped[str] = mapped_column(Text, nullable=False)
     author: Mapped[str | None] = mapped_column(String(255))
     score: Mapped[int] = mapped_column(Integer, default=0)
-    num_comments: Mapped[int] = mapped_column(Integer, default=0)
     created_utc: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     fetched_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()

@@ -164,7 +164,6 @@ def fetch_subreddit_json(
                 "url": f"https://www.reddit.com{post_data['permalink']}",
                 "author": post_data.get("author", "[deleted]"),
                 "score": post_data.get("score", 0),
-                "num_comments": post_data.get("num_comments", 0),
                 "created_utc": datetime.fromtimestamp(
                     post_data["created_utc"], tz=timezone.utc
                 ),
@@ -204,7 +203,6 @@ def save_json_post_to_db(
         url=post_data["url"],
         author=post_data.get("author", "[deleted]"),
         score=post_data.get("score", 0),
-        num_comments=post_data.get("num_comments", 0),
         created_utc=post_data["created_utc"],
         fetched_at=datetime.now(timezone.utc),
         comments=comments,

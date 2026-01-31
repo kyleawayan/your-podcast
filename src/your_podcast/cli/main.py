@@ -172,12 +172,12 @@ def clear(
                     console.print("Cancelled.")
                     raise typer.Exit(0)
 
-            # Delete posts associated with episodes first to avoid FK violation
+            # Unlink posts from episodes before deleting episodes
             if not (all or posts):  # Skip if posts were already deleted above
                 posts_count = session.query(Post).filter(Post.episode_id.isnot(None)).count()
                 if posts_count > 0:
-                    session.query(Post).filter(Post.episode_id.isnot(None)).delete()
-                    console.print(f"[green]Deleted {posts_count} associated posts[/green]")
+                    session.query(Post).filter(Post.episode_id.isnot(None)).update({Post.episode_id: None})
+                    console.print(f"[green]Unlinked {posts_count} posts from episodes[/green]")
 
             session.query(Episode).delete()
             console.print(f"[green]Deleted {count} episodes[/green]")

@@ -21,7 +21,6 @@ class PostAdmin(ModelView, model=Post):
         Post.title,
         Post.author,
         Post.score,
-        Post.num_comments,
         Post.created_utc,
         Post.fetched_at,
     ]
@@ -29,7 +28,6 @@ class PostAdmin(ModelView, model=Post):
     column_sortable_list = [
         Post.subreddit,
         Post.score,
-        Post.num_comments,
         Post.created_utc,
         Post.fetched_at,
     ]
