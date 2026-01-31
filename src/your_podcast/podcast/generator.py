@@ -17,6 +17,33 @@ from your_podcast.settings import get_settings
 
 console = Console()
 
+# Transcript directory used by Podcastfy
+TRANSCRIPT_DIR = Path("./data/transcripts")
+
+
+def _find_new_transcript(existing: set[Path]) -> str | None:
+    """Find newly created transcript file.
+
+    Args:
+        existing: Set of transcript paths that existed before generation.
+
+    Returns:
+        Absolute path to the new transcript, or None if not found.
+    """
+    if not TRANSCRIPT_DIR.exists():
+        return None
+    new = set(TRANSCRIPT_DIR.glob("transcript_*.txt")) - existing
+    if new:
+        return str(max(new, key=lambda p: p.stat().st_mtime).resolve())
+    return None
+
+
+def _get_existing_transcripts() -> set[Path]:
+    """Get set of existing transcript files before generation."""
+    if TRANSCRIPT_DIR.exists():
+        return set(TRANSCRIPT_DIR.glob("transcript_*.txt"))
+    return set()
+
 
 def generate_episode(
     session: Session,
@@ -124,9 +151,7 @@ def generate_episode(
             f"with Podcastfy + ElevenLabs...[/yellow]"
         )
 
-        # Find latest transcript before generation to detect the new one
-        transcript_dir = Path("./data/transcripts")
-        existing_transcripts = set(transcript_dir.glob("transcript_*.txt")) if transcript_dir.exists() else set()
+        existing_transcripts = _get_existing_transcripts()
 
         audio_path = generate_podcast(
             text=text_input,
@@ -136,13 +161,7 @@ def generate_episode(
             conversation_config=conversation_config,
         )
 
-        # Find the newly created transcript
-        transcript_path = ""
-        if transcript_dir.exists():
-            new_transcripts = set(transcript_dir.glob("transcript_*.txt")) - existing_transcripts
-            if new_transcripts:
-                transcript_path = str(max(new_transcripts, key=lambda p: p.stat().st_mtime).resolve())
-
+        transcript_path = _find_new_transcript(existing_transcripts) or ""
         if not transcript_path:
             console.print("[yellow]Warning: Could not find transcript file[/yellow]")
 
@@ -155,9 +174,7 @@ def generate_episode(
             f"with Podcastfy + macOS voices...[/yellow]"
         )
 
-        # Find latest transcript before generation to detect the new one
-        transcript_dir = Path("./data/transcripts")
-        existing_transcripts = set(transcript_dir.glob("transcript_*.txt")) if transcript_dir.exists() else set()
+        existing_transcripts = _get_existing_transcripts()
 
         # Generate transcript only (no TTS) using Podcastfy + Claude
         generate_podcast(
@@ -169,13 +186,7 @@ def generate_episode(
             transcript_only=True,
         )
 
-        # Find the newly created transcript (Podcastfy saves it automatically)
-        transcript_path = ""
-        if transcript_dir.exists():
-            new_transcripts = set(transcript_dir.glob("transcript_*.txt")) - existing_transcripts
-            if new_transcripts:
-                transcript_path = str(max(new_transcripts, key=lambda p: p.stat().st_mtime).resolve())
-
+        transcript_path = _find_new_transcript(existing_transcripts)
         if not transcript_path:
             raise ValueError("Podcast generation failed - no transcript file produced")
 

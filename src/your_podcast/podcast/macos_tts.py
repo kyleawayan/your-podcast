@@ -72,6 +72,20 @@ def get_pause_duration(text: str) -> int:
         return random.randint(300, 500)
 
 
+def _validate_voice(voice: str) -> None:
+    """Check if a macOS voice is available.
+
+    Raises:
+        ValueError: If the voice is not found on the system.
+    """
+    result = subprocess.run(["say", "-v", voice, ""], capture_output=True, text=True)
+    if result.returncode != 0 or "not found" in result.stderr.lower():
+        raise ValueError(
+            f"Voice '{voice}' not found. "
+            f"Run 'say -v ?' to list available voices."
+        )
+
+
 def generate_audio_macos(
     transcript: str,
     voice_1: str,
@@ -83,14 +97,18 @@ def generate_audio_macos(
 
     Args:
         transcript: Podcastfy-formatted transcript with <Person1>/<Person2> tags.
-        voice_1: macOS voice name for Person1 (e.g., "Ava (Premium)").
-        voice_2: macOS voice name for Person2 (e.g., "Zoe (Premium)").
+        voice_1: macOS voice name for Person1 (e.g., "Zoe (Premium)").
+        voice_2: macOS voice name for Person2 (e.g., "Lee (Premium)").
         output_path: Path to save the final combined audio file (.aiff).
         rate: Speech rate in words per minute (default 165).
 
     Returns:
         Path to the generated audio file.
     """
+    # Validate voices upfront before processing
+    _validate_voice(voice_1)
+    _validate_voice(voice_2)
+
     segments = parse_transcript(transcript)
     if not segments:
         raise ValueError("No speaker segments found in transcript")

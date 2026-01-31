@@ -30,8 +30,8 @@ class Settings(BaseSettings):
     # macOS TTS voices (Premium/Siri voices recommended)
     # Install via: System Settings > Accessibility > Spoken Content > System Voice > Manage Voices
     # Or on Sequoia+: VoiceOver Utility > Speech
-    macos_voice_1: str = "Ava (Premium)"  # Person1 (host asking questions)
-    macos_voice_2: str = "Zoe (Premium)"  # Person2 (host answering)
+    macos_voice_1: str = "Zoe (Premium)"  # Person1 (host asking questions)
+    macos_voice_2: str = "Lee (Premium)"  # Person2 (host answering)
 
 
 @lru_cache
