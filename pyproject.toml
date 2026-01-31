@@ -9,6 +9,7 @@ dependencies = [
     "alembic",
     "pydantic-settings",
     "typer",
+    "click>=8.1.7,<8.2",  # Pin to avoid Click 8.2+ breaking change with Typer
     "rich",
     "sqladmin[full]",
     "fastapi",
