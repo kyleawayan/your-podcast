@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     # TTS backend: "elevenlabs" or "macos"
     tts_backend: str = "elevenlabs"
 
+    # ElevenLabs voice IDs (find at elevenlabs.io/voice-library)
+    elevenlabs_voice_1: str = "okH1aHncYRU2dc9TP3hV"  # Person1 (host asking questions)
+    elevenlabs_voice_2: str = "WIX8boagHAO6uMUqxXLz"  # Person2 (host answering)
+
     # macOS TTS voices (Premium/Siri voices recommended)
     # Install via: System Settings > Accessibility > Spoken Content > System Voice > Manage Voices
     # Or on Sequoia+: VoiceOver Utility > Speech

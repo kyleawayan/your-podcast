@@ -139,8 +139,8 @@ def generate_episode(
         conversation_config["text_to_speech"] = {
             "elevenlabs": {
                 "default_voices": {
-                    "question": "okH1aHncYRU2dc9TP3hV",
-                    "answer": "WIX8boagHAO6uMUqxXLz",
+                    "question": settings.elevenlabs_voice_1,
+                    "answer": settings.elevenlabs_voice_2,
                 },
                 "model": "eleven_multilingual_v2",
             },

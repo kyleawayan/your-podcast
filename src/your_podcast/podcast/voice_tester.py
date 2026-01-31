@@ -59,10 +59,9 @@ def test_elevenlabs_voices() -> Path | None:
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     output_path = OUTPUT_DIR / "test_elevenlabs.mp3"
 
-    # Voice IDs from generator.py config
     voices = {
-        1: "okH1aHncYRU2dc9TP3hV",  # Person1
-        2: "WIX8boagHAO6uMUqxXLz",  # Person2
+        1: settings.elevenlabs_voice_1,
+        2: settings.elevenlabs_voice_2,
     }
 
     console.print("[bold]Testing ElevenLabs TTS...[/bold]")
