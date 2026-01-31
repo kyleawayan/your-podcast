@@ -30,6 +30,23 @@ def parse_transcript(transcript: str) -> list[tuple[int, str]]:
     return segments
 
 
+def replace_filler_words(text: str) -> str:
+    """Replace filler words that sound awkward with macOS TTS.
+
+    Words like 'mmhmm' don't pronounce well, so we replace them with
+    natural alternatives like 'Yeah', 'Yes', 'Right', 'Yep'.
+    """
+    replacements = ["Yeah", "Yes", "Right", "Yep"]
+
+    # Match variations: mm-hmm, Mm-hmm, mmhmm, Mmhmm, mm hmm, etc.
+    pattern = r"\b[Mm]m[- ]?[Hh]mm?\b"
+
+    def get_replacement(match: re.Match) -> str:
+        return random.choice(replacements)
+
+    return re.sub(pattern, get_replacement, text)
+
+
 def get_pause_duration(text: str) -> int:
     """Determine pause duration (ms) based on how a segment ends.
 
@@ -90,13 +107,16 @@ def generate_audio_macos(
             voice = voices[speaker]
             segment_path = Path(tmp_dir) / f"segment_{i:04d}.aiff"
 
+            # Clean up filler words that sound awkward with TTS
+            cleaned_text = replace_filler_words(text)
+
             # Use macOS say command to generate audio segment
             cmd = [
                 "say",
                 "-v", voice,
                 "-r", str(rate),
                 "-o", str(segment_path),
-                text,
+                cleaned_text,
             ]
 
             result = subprocess.run(cmd, capture_output=True, text=True)
