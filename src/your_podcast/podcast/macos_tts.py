@@ -47,6 +47,15 @@ def replace_filler_words(text: str) -> str:
     return re.sub(pattern, get_replacement, text)
 
 
+def strip_emotion_tags(text: str) -> str:
+    """Strip emotion tags like [laugh], [cough], [sigh] from text.
+
+    ElevenLabs handles these natively, but macOS TTS would speak them literally.
+    """
+    # Match [word] patterns - common emotions/sounds
+    return re.sub(r"\[(?:laugh|cough|sigh|chuckle|gasp|groan)\]", "", text)
+
+
 def get_pause_duration(text: str) -> int:
     """Determine pause duration (ms) based on how a segment ends.
 
@@ -125,8 +134,8 @@ def generate_audio_macos(
             voice = voices[speaker]
             segment_path = Path(tmp_dir) / f"segment_{i:04d}.aiff"
 
-            # Clean up filler words that sound awkward with TTS
-            cleaned_text = replace_filler_words(text)
+            # Clean up filler words and emotion tags that sound awkward with TTS
+            cleaned_text = strip_emotion_tags(replace_filler_words(text))
 
             # Use macOS say command to generate audio segment
             cmd = [

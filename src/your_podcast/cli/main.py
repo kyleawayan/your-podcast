@@ -271,5 +271,43 @@ def generate(
             raise typer.Exit(1)
 
 
+@app.command("test-voices")
+def test_voices(
+    play: bool = typer.Option(False, "--play", "-p", help="Play each audio file after generation"),
+) -> None:
+    """Test TTS voice providers with a sample transcript.
+
+    Generates short audio clips using all configured providers (macOS + ElevenLabs)
+    and saves them to data/test_audio/ for manual comparison.
+    """
+    from your_podcast.podcast.voice_tester import run_all_tests
+
+    console.print("[bold]Running voice tests...[/bold]\n")
+    results = run_all_tests()
+
+    console.print("\n[bold]Results:[/bold]")
+    for provider, path in results.items():
+        if path:
+            console.print(f"  [green]{provider}:[/green] {path}")
+        else:
+            console.print(f"  [yellow]{provider}:[/yellow] skipped or failed")
+
+    if play:
+        console.print("\n[bold]Playback:[/bold]")
+        console.print("[dim]Press Enter to play each file, Ctrl+C to exit[/dim]\n")
+
+        for provider, path in results.items():
+            if not path:
+                continue
+
+            try:
+                input(f"[{provider}] Press Enter to play...")
+                console.print(f"[cyan]Playing {provider}...[/cyan]")
+                subprocess.run(["afplay", str(path)], check=True)
+            except KeyboardInterrupt:
+                console.print("\n[yellow]Playback cancelled[/yellow]")
+                break
+
+
 if __name__ == "__main__":
     app()

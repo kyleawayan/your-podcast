@@ -1,0 +1,6 @@
+<Person1>"Hey, welcome back everyone! We've got some great stuff to talk about today."</Person1>
+<Person2>"Oh man, you're not kidding! But seriously, this is going to be good."</Person2>
+<Person1>"So what do you think about this whole situation?"</Person1>
+<Person2>"Where do I even start? It's complicated, but let me break it down for you."</Person2>
+<Person1>"Yeah, take your time. I know our listeners are really curious about this one."</Person1>
+<Person2>"Well, first of all, you have to understand the context here. It's wild."</Person2>
