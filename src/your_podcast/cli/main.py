@@ -315,7 +315,7 @@ def generate(
             log_generation(
                 post_count=episode.post_count,
                 render_seconds=render_seconds,
-                llm_model="claude-sonnet-4-5",
+                llm_model="gemini-2.5-flash",
                 tts_model=tts_model_map.get(effective_tts, effective_tts),
                 longform=longform,
                 duration_seconds=duration_seconds,

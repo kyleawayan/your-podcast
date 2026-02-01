@@ -1,8 +1,6 @@
 """Podcast episode generator using Podcastfy."""
 
 import random
-
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -76,11 +74,7 @@ def generate_episode(
     """
     settings = get_settings()
     tts_backend = tts_backend or settings.tts_backend
-
-    # Set Podcastfy environment variables
-    os.environ["ANTHROPIC_API_KEY"] = settings.anthropic_api_key
-    if tts_backend == "elevenlabs":
-        os.environ["ELEVENLABS_API_KEY"] = settings.elevenlabs_api_key
+    # Podcastfy picks up API keys from environment variables automatically
 
     # Query unused posts (not yet in an episode)
     query = session.query(Post).filter(Post.episode_id.is_(None))
@@ -155,8 +149,8 @@ def generate_episode(
         audio_path = generate_podcast(
             text=text_input,
             tts_model="elevenlabs",
-            llm_model_name="anthropic/claude-sonnet-4-5",
-            api_key_label="ANTHROPIC_API_KEY",
+            llm_model_name="gemini-2.5-flash",
+            api_key_label="GEMINI_API_KEY",
             conversation_config=conversation_config,
             longform=longform,
         )
@@ -174,12 +168,12 @@ def generate_episode(
 
         existing_transcripts = _get_existing_transcripts()
 
-        # Generate transcript only (no TTS) using Podcastfy + Claude
+        # Generate transcript only (no TTS) using Podcastfy
         generate_podcast(
             text=text_input,
             tts_model="elevenlabs",
-            llm_model_name="anthropic/claude-sonnet-4-5",
-            api_key_label="ANTHROPIC_API_KEY",
+            llm_model_name="gemini-2.5-flash",
+            api_key_label="GEMINI_API_KEY",
             conversation_config=conversation_config,
             transcript_only=True,
             longform=longform,
@@ -211,12 +205,12 @@ def generate_episode(
 
         existing_transcripts = _get_existing_transcripts()
 
-        # Generate transcript only (no TTS) using Podcastfy + Claude
+        # Generate transcript only (no TTS) using Podcastfy
         generate_podcast(
             text=text_input,
             tts_model="elevenlabs",
-            llm_model_name="anthropic/claude-sonnet-4-5",
-            api_key_label="ANTHROPIC_API_KEY",
+            llm_model_name="gemini-2.5-flash",
+            api_key_label="GEMINI_API_KEY",
             conversation_config=conversation_config,
             transcript_only=True,
             longform=longform,
