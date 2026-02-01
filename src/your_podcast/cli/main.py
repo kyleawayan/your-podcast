@@ -255,12 +255,17 @@ def generate(
             # Log stats for optimization tracking
             from your_podcast.settings import get_settings
             effective_tts = tts or get_settings().tts_backend
+            tts_model_map = {
+                "macos": "macos_say",
+                "chatterbox": "chatterbox_turbo",
+                "elevenlabs": "eleven_multilingual_v2",
+            }
             log_generation(
                 post_count=episode.post_count,
                 word_count=word_count,
                 render_seconds=render_seconds,
                 llm_model="claude-sonnet-4-5",
-                tts_model="macos_say" if effective_tts == "macos" else "eleven_multilingual_v2",
+                tts_model=tts_model_map.get(effective_tts, effective_tts),
             )
 
         except ValueError as e:
