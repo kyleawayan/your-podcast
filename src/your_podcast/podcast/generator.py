@@ -51,7 +51,7 @@ def generate_episode(
     limit: int = 10,
     subreddits: list[str] | None = None,
     output_dir: str = "./data/podcasts",
-    word_count: int = 500,
+    longform: bool = True,
     sort_by_score: bool = False,
     tts_backend: str | None = None,
 ) -> Episode:
@@ -66,7 +66,8 @@ def generate_episode(
         limit: Maximum number of posts to include in podcast
         subreddits: Optional list of subreddits to filter by
         output_dir: Directory to save audio and transcript files
-        word_count: Target word count for podcast transcript (~150 words = 1 min audio)
+        longform: If True, use longform mode for complete coverage (default).
+                  If False, use shortform mode (faster but may truncate).
         sort_by_score: If True, select top posts by engagement (score + comments); otherwise random
         tts_backend: TTS backend to use ("elevenlabs" or "macos"). Defaults to settings.
 
@@ -128,7 +129,6 @@ def generate_episode(
 
     # Configure podcast conversation
     conversation_config = {
-        "word_count": word_count,
         "conversation_style": ["casual", "informative"],
         "podcast_name": "Reddit Digest",
         "podcast_tagline": "Your Daily Dose of Reddit",
@@ -147,10 +147,8 @@ def generate_episode(
             },
         }
 
-        console.print(
-            f"[yellow]Generating ~{word_count // 150} minute podcast "
-            f"with Podcastfy + ElevenLabs...[/yellow]"
-        )
+        mode_str = "longform" if longform else "shortform"
+        console.print(f"[yellow]Generating podcast with Podcastfy + ElevenLabs ({mode_str})...[/yellow]")
 
         existing_transcripts = _get_existing_transcripts()
 
@@ -160,6 +158,7 @@ def generate_episode(
             llm_model_name="anthropic/claude-sonnet-4-5",
             api_key_label="ANTHROPIC_API_KEY",
             conversation_config=conversation_config,
+            longform=longform,
         )
 
         transcript_path = _find_new_transcript(existing_transcripts) or ""
@@ -170,10 +169,8 @@ def generate_episode(
             raise ValueError("Podcast generation failed - no audio file produced")
 
     elif tts_backend == "macos":
-        console.print(
-            f"[yellow]Generating ~{word_count // 150} minute podcast "
-            f"with Podcastfy + macOS voices...[/yellow]"
-        )
+        mode_str = "longform" if longform else "shortform"
+        console.print(f"[yellow]Generating podcast with Podcastfy + macOS voices ({mode_str})...[/yellow]")
 
         existing_transcripts = _get_existing_transcripts()
 
@@ -185,6 +182,7 @@ def generate_episode(
             api_key_label="ANTHROPIC_API_KEY",
             conversation_config=conversation_config,
             transcript_only=True,
+            longform=longform,
         )
 
         transcript_path = _find_new_transcript(existing_transcripts)
@@ -208,10 +206,8 @@ def generate_episode(
         )
 
     elif tts_backend == "chatterbox":
-        console.print(
-            f"[yellow]Generating ~{word_count // 150} minute podcast "
-            f"with Podcastfy + Chatterbox-Turbo...[/yellow]"
-        )
+        mode_str = "longform" if longform else "shortform"
+        console.print(f"[yellow]Generating podcast with Podcastfy + Chatterbox ({mode_str})...[/yellow]")
 
         existing_transcripts = _get_existing_transcripts()
 
@@ -223,6 +219,7 @@ def generate_episode(
             api_key_label="ANTHROPIC_API_KEY",
             conversation_config=conversation_config,
             transcript_only=True,
+            longform=longform,
         )
 
         transcript_path = _find_new_transcript(existing_transcripts)
