@@ -106,7 +106,7 @@ def fetch(
     time_filter: str = typer.Option(
         "day", "--time", "-t", help="Time filter for top posts (hour, day, week, month, year, all)"
     ),
-    limit: int = typer.Option(25, "--limit", "-l", help="Posts per subreddit (max 100)"),
+    limit: int = typer.Option(100, "--limit", "-l", help="Posts per subreddit (max 100)"),
     comment_limit: int = typer.Option(10, "--comments", "-c", help="Comments per post"),
 ) -> None:
     """Fetch posts and comments from Reddit subreddits via JSON API."""

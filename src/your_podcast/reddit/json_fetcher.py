@@ -118,7 +118,7 @@ def fetch_subreddit_json(
     subreddit_name: str,
     sort: str = "hot",
     time_filter: str = "day",
-    limit: int = 25,
+    limit: int = 100,
     on_wait: Callable[[float, int], None] | None = None,
 ) -> tuple[list[dict], Response | None]:
     """Fetch posts from a subreddit via JSON API.
@@ -137,7 +137,12 @@ def fetch_subreddit_json(
 
     # Build URL
     base_url = f"https://www.reddit.com/r/{subreddit_name}/{sort}.json"
-    params = {"limit": min(limit, 100)}
+    if limit > 100:
+        raise NotImplementedError(
+            f"Limit of {limit} exceeds Reddit's max of 100 per request. "
+            "Pagination not yet implemented."
+        )
+    params = {"limit": limit}
     if sort in ("top", "controversial"):
         params["t"] = time_filter
 
@@ -216,7 +221,7 @@ def fetch_and_save_subreddit_json(
     subreddit_name: str,
     sort: str = "hot",
     time_filter: str = "day",
-    post_limit: int = 25,
+    post_limit: int = 100,
     comment_limit: int = 10,
     on_progress: Callable[[str], None] | None = None,
 ) -> tuple[int, int, Response | None]:
