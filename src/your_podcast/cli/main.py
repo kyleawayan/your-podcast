@@ -221,8 +221,9 @@ def admin(
     uvicorn.run(app, host=host, port=port)
 
 
-# Hardcoded estimate: ~50 seconds per post (based on historical data)
-SECONDS_PER_POST = 50
+# Duration estimates per post (based on historical data)
+SECONDS_PER_POST_LONGFORM = 180  # ~3 min/post in longform mode
+SECONDS_PER_POST_SHORTFORM = 50  # ~50 sec/post in shortform mode
 
 
 @app.command()
@@ -251,7 +252,7 @@ def generate(
     and generates a podcast with Podcastfy. Posts are marked as used after generation.
 
     Specify either --limit (number of posts) or --duration (target minutes), not both.
-    Default: 5 posts (~4 minutes).
+    Default: 5 posts (~15 minutes).
 
     Uses longform mode by default for complete coverage of all posts.
     Use --shortform for faster generation (may truncate with many posts).
@@ -265,13 +266,13 @@ def generate(
 
     # Calculate post limit from duration or use default
     if duration is not None:
-        limit = max(1, round(duration * 60 / SECONDS_PER_POST))
-        estimated_duration = limit * SECONDS_PER_POST / 60
+        limit = max(1, round(duration * 60 / SECONDS_PER_POST_LONGFORM))
+        estimated_duration = limit * SECONDS_PER_POST_LONGFORM / 60
         console.print(f"[bold]Target: {duration} min → using {limit} posts (est. ~{estimated_duration:.0f} min)[/bold]")
     elif limit is None:
         limit = 5  # Default
 
-    estimated_duration = limit * SECONDS_PER_POST / 60
+    estimated_duration = limit * SECONDS_PER_POST_LONGFORM / 60
     console.print(f"[bold]Generating podcast episode (~{estimated_duration:.0f} min from {limit} posts)...[/bold]")
     start_time = time.time()
 
