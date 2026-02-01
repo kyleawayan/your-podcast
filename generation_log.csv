@@ -1,8 +1,8 @@
-commit_hash,dirty,post_count,word_count,llm_model,tts_model,render_seconds
+commit_hash,dirty,post_count,word_count,llm_model,tts_model,render_seconds,longform,duration_seconds
 dea0ad0,true,20,1000,claude-sonnet-4-5,eleven_multilingual_v2,280.1
 dea0ad0,true,20,1000,claude-sonnet-4-5,eleven_multilingual_v2,315.5
 b9f3e30,True,10,1000,claude-sonnet-4-5,eleven_multilingual_v2,304.3
 c1bea31,True,10,500,claude-sonnet-4-5,macos_say,187.1
 c54cf99,False,10,500,claude-sonnet-4-5,macos_say,131.8
 62259d9,False,10,1000,claude-sonnet-4-5,chatterbox_turbo,1073.3
-281f1cc,True,36,-1,True,claude-sonnet-4-5,macos_say,1738.9,6592.1
+281f1cc,True,36,-1,claude-sonnet-4-5,macos_say,1738.9,True,6592.1

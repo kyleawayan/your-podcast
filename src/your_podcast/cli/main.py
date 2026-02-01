@@ -74,10 +74,10 @@ def log_generation(
         "dirty": dirty,
         "post_count": post_count,
         "word_count": -1,  # Deprecated, kept for CSV compatibility
-        "longform": longform,
         "llm_model": llm_model,
         "tts_model": tts_model,
         "render_seconds": round(render_seconds, 1),
+        "longform": longform,
         "duration_seconds": round(duration_seconds, 1) if duration_seconds else "",
     }
 
