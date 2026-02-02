@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from your_podcast.db.models import Episode, Post
 from your_podcast.podcast.chatterbox_tts import generate_audio_chatterbox
+from your_podcast.podcast.google_cloud_tts import generate_audio_google_cloud
 from your_podcast.podcast.macos_tts import generate_audio_macos
 from your_podcast.reddit.comment_fetcher import format_post_with_comments
 from your_podcast.settings import get_settings
@@ -236,8 +237,46 @@ def generate_episode(
             output_path=audio_file,
         )
 
+    elif tts_backend == "google_cloud":
+        mode_str = "longform" if longform else "shortform"
+        console.print(f"[yellow]Generating podcast with Podcastfy + Google Cloud TTS ({mode_str})...[/yellow]")
+
+        existing_transcripts = _get_existing_transcripts()
+
+        # Generate transcript only (no TTS) using Podcastfy
+        generate_podcast(
+            text=text_input,
+            tts_model="elevenlabs",
+            llm_model_name="gemini-2.5-flash",
+            api_key_label="GEMINI_API_KEY",
+            conversation_config=conversation_config,
+            transcript_only=True,
+            longform=longform,
+        )
+
+        transcript_path = _find_new_transcript(existing_transcripts)
+        if not transcript_path:
+            raise ValueError("Podcast generation failed - no transcript file produced")
+
+        # Read the transcript content
+        transcript_text = Path(transcript_path).read_text()
+
+        # Generate audio with Google Cloud TTS
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        audio_file = str(output_path / f"podcast_{timestamp}.mp3")
+
+        audio_path = generate_audio_google_cloud(
+            transcript=transcript_text,
+            voice_1=settings.google_cloud_voice_1,
+            voice_2=settings.google_cloud_voice_2,
+            output_path=audio_file,
+            model=settings.google_cloud_model,
+        )
+
     else:
-        raise ValueError(f"Unknown TTS backend: {tts_backend}. Use 'elevenlabs', 'macos', or 'chatterbox'.")
+        raise ValueError(f"Unknown TTS backend: {tts_backend}. Use 'elevenlabs', 'macos', 'chatterbox', or 'google_cloud'.")
 
     # Resolve audio path to absolute
     audio_path = str(Path(audio_path).resolve())
