@@ -193,12 +193,12 @@ def clear(
                     console.print("Cancelled.")
                     raise typer.Exit(0)
 
-            # Unlink posts from episodes before deleting episodes
-            if not (all or posts):  # Skip if posts were already deleted above
-                posts_count = session.query(Post).filter(Post.episode_id.isnot(None)).count()
-                if posts_count > 0:
-                    session.query(Post).filter(Post.episode_id.isnot(None)).update({Post.episode_id: None})
-                    console.print(f"[green]Unlinked {posts_count} posts from episodes[/green]")
+            # Clear post-episode associations before deleting episodes
+            from your_podcast.db.models import post_episodes
+
+            result = session.execute(post_episodes.delete())
+            if result.rowcount > 0:
+                console.print(f"[green]Cleared {result.rowcount} post-episode associations[/green]")
 
             session.query(Episode).delete()
             console.print(f"[green]Deleted {count} episodes[/green]")

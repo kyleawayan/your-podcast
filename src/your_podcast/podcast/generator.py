@@ -82,7 +82,7 @@ def generate_episode(
     # Query posts
     query = session.query(Post)
     if not include_covered_posts:
-        query = query.filter(Post.episode_id.is_(None))
+        query = query.filter(~Post.episodes.any())
 
     if subreddits:
         query = query.filter(Post.subreddit.in_(subreddits))
@@ -315,7 +315,7 @@ def generate_episode(
 
     # Mark posts as used in this episode
     for post in posts:
-        post.episode_id = episode.id
+        post.episodes.append(episode)
 
     session.commit()
     session.refresh(episode)
