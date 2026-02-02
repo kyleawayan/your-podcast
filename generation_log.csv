@@ -7,3 +7,4 @@ c54cf99,False,10,500,claude-sonnet-4-5,macos_say,131.8
 62259d9,False,10,1000,claude-sonnet-4-5,chatterbox_turbo,1073.3
 281f1cc,True,36,-1,claude-sonnet-4-5,macos_say,1738.9,True,6592.1
 b42dcaa,True,600,-1,gemini-2.5-flash,google_cloud,1702.1,True,3564.9
+c534dd1,False,20,-1,gemini-2.5-flash,google_cloud,878.1,True,2375.9
