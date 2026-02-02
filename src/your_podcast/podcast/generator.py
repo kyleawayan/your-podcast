@@ -53,6 +53,7 @@ def generate_episode(
     longform: bool = True,
     sort_by_score: bool = False,
     tts_backend: str | None = None,
+    include_covered_posts: bool = False,
 ) -> Episode:
     """
     Generate a podcast episode from fetched Reddit posts.
@@ -69,6 +70,7 @@ def generate_episode(
                   If False, use shortform mode (faster but may truncate).
         sort_by_score: If True, select top posts by engagement (score + comments); otherwise random
         tts_backend: TTS backend to use ("elevenlabs" or "macos"). Defaults to settings.
+        include_covered_posts: If True, include posts already covered in previous episodes.
 
     Returns:
         Episode: Created episode record with paths to generated files
@@ -77,8 +79,10 @@ def generate_episode(
     tts_backend = tts_backend or settings.tts_backend
     # Podcastfy picks up API keys from environment variables automatically
 
-    # Query unused posts (not yet in an episode)
-    query = session.query(Post).filter(Post.episode_id.is_(None))
+    # Query posts
+    query = session.query(Post)
+    if not include_covered_posts:
+        query = query.filter(Post.episode_id.is_(None))
 
     if subreddits:
         query = query.filter(Post.subreddit.in_(subreddits))

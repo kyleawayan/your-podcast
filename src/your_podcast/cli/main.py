@@ -245,6 +245,9 @@ def generate(
     tts: str = typer.Option(
         None, "--tts", help="TTS backend: 'elevenlabs' or 'macos' (default from settings)"
     ),
+    include_covered_posts: bool = typer.Option(
+        False, "--include-covered-posts", help="Include posts already covered in previous episodes"
+    ),
 ) -> None:
     """Generate a podcast episode from fetched Reddit posts.
 
@@ -288,6 +291,7 @@ def generate(
                 longform=longform,
                 sort_by_score=by_engagement,
                 tts_backend=tts,
+                include_covered_posts=include_covered_posts,
             )
             render_seconds = time.time() - start_time
 
