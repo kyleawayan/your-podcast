@@ -1,9 +1,13 @@
 """SQLAdmin admin interface."""
 
-from fastapi import FastAPI
-from sqladmin import Admin, ModelView
+from typing import Any
 
-from your_podcast.db.models import Episode, Post
+from fastapi import FastAPI
+from sqlalchemy import delete
+from sqladmin import Admin, ModelView
+from starlette.requests import Request
+
+from your_podcast.db.models import Episode, Post, post_episodes
 from your_podcast.db.session import get_engine
 
 
@@ -61,6 +65,14 @@ class EpisodeAdmin(ModelView, model=Episode):
     column_searchable_list = [Episode.title, Episode.description]
     column_sortable_list = [Episode.post_count, Episode.created_at]
     column_default_sort = [(Episode.created_at, True)]
+
+    async def on_model_delete(self, model: Any, request: Request) -> None:
+        """Delete junction table entries before deleting episode."""
+        with self.session_maker() as session:
+            session.execute(
+                delete(post_episodes).where(post_episodes.c.episode_id == model.id)
+            )
+            session.commit()
 
 
 def create_app() -> FastAPI:
