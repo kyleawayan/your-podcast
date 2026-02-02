@@ -291,8 +291,11 @@ def generate(
             )
             render_seconds = time.time() - start_time
 
-            # Get actual audio duration
+            # Get actual audio duration and save to database
             duration_seconds = get_audio_duration(episode.audio_path)
+            if duration_seconds:
+                episode.duration_seconds = int(duration_seconds)
+                session.commit()
             duration_str = f"{duration_seconds / 60:.1f} min" if duration_seconds else "unknown"
 
             console.print(f"\n[green]Success![/green] Podcast episode generated:")

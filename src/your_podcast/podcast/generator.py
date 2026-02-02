@@ -123,10 +123,15 @@ def generate_episode(
     console.print(f"[yellow]Prepared {len(content_parts)} posts for podcast...[/yellow]")
 
     # Configure podcast conversation
+    today = datetime.now()
+    tagline = f"Your personalized podcast just for you, for the day of {today.strftime('%B')} {today.day}, {today.year}"
     conversation_config = {
-        "conversation_style": ["casual", "informative"],
-        "podcast_name": "Reddit Digest",
-        "podcast_tagline": "Your Daily Dose of Reddit",
+        "conversation_style": ["casual", "informative", "enthusiastic"],
+        "podcast_name": "Your Podcast",
+        "podcast_tagline": tagline,
+        "dialogue_structure": ["Introduction", "Main Content Summary", "Conclusion"],
+        "roles_person1": "main host who introduces topics and drives the conversation",
+        "roles_person2": "co-host who adds commentary, asks questions, and provides different perspectives",
     }
 
     if tts_backend == "elevenlabs":
@@ -284,11 +289,11 @@ def generate_episode(
     # Generate episode title from subreddits
     if subreddits:
         subreddit_list = ", ".join(f"r/{s}" for s in subreddits)
-        title = f"Reddit Digest: {subreddit_list}"
+        title = f"Your Podcast: {subreddit_list}"
     else:
         unique_subreddits = list(set(post.subreddit for post in posts))
         subreddit_list = ", ".join(f"r/{s}" for s in unique_subreddits[:3])
-        title = f"Reddit Digest: {subreddit_list}"
+        title = f"Your Podcast: {subreddit_list}"
         if len(unique_subreddits) > 3:
             title += f" and {len(unique_subreddits) - 3} more"
 
