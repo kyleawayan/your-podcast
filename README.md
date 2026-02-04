@@ -52,3 +52,7 @@ uv run your-podcast clear --all        # clear everything
 uv run your-podcast admin
 # Visit http://127.0.0.1:8000/admin
 ```
+
+## Known Limitations
+
+- **Posts are "frozen" after first fetch**: To speed up fetching, we skip re-fetching comments and applying updated post metadata for posts already in the database.

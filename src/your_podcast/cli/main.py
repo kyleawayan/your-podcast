@@ -110,7 +110,18 @@ def fetch(
     comment_limit: int = typer.Option(10, "--comments", "-c", help="Comments per post"),
 ) -> None:
     """Fetch posts and comments from Reddit subreddits via JSON API."""
-    console.print(f"[bold]Fetching from {len(subreddits)} subreddit(s)...[/bold]")
+    # Estimate max time (assumes all posts are new - actual time may be less)
+    max_posts = len(subreddits) * limit
+    estimated_seconds = max_posts * 6  # 6 seconds per request (10 QPM rate limit)
+    hours, remainder = divmod(int(estimated_seconds), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours > 0:
+        eta_str = f"~{hours}h {minutes}m max"
+    elif minutes > 0:
+        eta_str = f"~{minutes}m {seconds}s max"
+    else:
+        eta_str = f"~{seconds}s max"
+    console.print(f"[bold]Fetching from {len(subreddits)} subreddit(s)...[/bold] ({eta_str})")
 
     total_posts = 0
     total_comments = 0

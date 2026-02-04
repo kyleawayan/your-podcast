@@ -13,7 +13,7 @@ from your_podcast.reddit.comment_fetcher import fetch_comments
 from your_podcast.settings import get_settings
 
 
-def adaptive_delay(response: Response, base_delay: float = 0.5) -> float:
+def adaptive_delay(response: Response, base_delay: float = 6.0) -> float:
     """Calculate delay based on Reddit's rate limit headers.
 
     Args:
@@ -253,15 +253,28 @@ def fetch_and_save_subreddit_json(
 
     # Collect all posts with comments first (atomic per subreddit)
     posts_with_comments: list[tuple[dict, list[dict]]] = []
-    delay = 0.5  # Base delay
+    delay = 6.0  # Base delay - stay under 10 QPM for unauthenticated requests
 
-    for i, post_data in enumerate(posts):
+    # Filter out posts we already have (skip fetching comments for existing posts)
+    existing_ids = {
+        p.reddit_id
+        for p in session.query(Post.reddit_id)
+        .filter(Post.reddit_id.in_([p["reddit_id"] for p in posts]))
+        .all()
+    }
+    new_posts_to_fetch = [p for p in posts if p["reddit_id"] not in existing_ids]
+
+    for i, post_data in enumerate(new_posts_to_fetch):
+        # Calculate ETA based on remaining posts and delay
+        remaining_posts = len(new_posts_to_fetch) - (i + 1)
+        eta_seconds = remaining_posts * delay
+        eta_str = f"{int(eta_seconds // 60)}m{int(eta_seconds % 60):02d}s"
         if on_progress:
-            on_progress(f"fetching comments ({i + 1}/{len(posts)})...")
+            on_progress(f"fetching comments ({i + 1}/{len(new_posts_to_fetch)}) - ~{eta_str} remaining")
 
         # Wait before fetching comments (adaptive rate limiting)
         if last_response:
-            delay = adaptive_delay(last_response, base_delay=0.5)
+            delay = adaptive_delay(last_response, base_delay=6.0)
         time.sleep(delay)
 
         # Fetch comments for this post (with rate limit callback)
