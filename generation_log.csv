@@ -9,3 +9,7 @@ c54cf99,False,10,500,claude-sonnet-4-5,macos_say,131.8
 b42dcaa,True,600,-1,gemini-2.5-flash,google_cloud,1702.1,True,3564.9
 c534dd1,False,20,-1,gemini-2.5-flash,google_cloud,878.1,True,2375.9
 f00c0c7,False,40,-1,gemini-2.5-flash,google_cloud,2002.8,True,4260.4
+82c04f0,True,2,-1,gemini-2.5-flash,google_cloud,583.4,True,1515.3
+82c04f0,True,2,-1,gemini-2.5-flash,google_cloud,583.8,True,1488.9
+82c04f0,True,2,-1,gemini-2.5-flash,google_cloud,362.4,True,913.8
+82c04f0,True,2,-1,gemini-2.5-flash,google_cloud,846.1,True,2383.9

@@ -237,6 +237,18 @@ SECONDS_PER_POST_LONGFORM = 180  # ~3 min/post in longform mode
 SECONDS_PER_POST_SHORTFORM = 50  # ~50 sec/post in shortform mode
 
 
+def get_or_create_user(session, name: str):
+    """Get user by name, creating if it doesn't exist."""
+    from your_podcast.db.models import User
+
+    user = session.query(User).filter(User.name == name).first()
+    if not user:
+        user = User(name=name)
+        session.add(user)
+        session.flush()  # Get the ID without committing
+    return user
+
+
 @app.command()
 def generate(
     limit: int = typer.Option(None, "--limit", "-l", help="Number of posts to include"),
@@ -258,6 +270,9 @@ def generate(
     ),
     include_covered_posts: bool = typer.Option(
         False, "--include-covered-posts", help="Include posts already covered in previous episodes"
+    ),
+    user: str = typer.Option(
+        "global", "--user", "-u", help="User name for this episode (for tracking covered posts)"
     ),
 ) -> None:
     """Generate a podcast episode from fetched Reddit posts.
@@ -287,12 +302,15 @@ def generate(
         limit = 5  # Default
 
     estimated_duration = limit * SECONDS_PER_POST_LONGFORM / 60
-    console.print(f"[bold]Generating podcast episode (~{estimated_duration:.0f} min from {limit} posts)...[/bold]")
+    console.print(f"[bold]Generating podcast episode (~{estimated_duration:.0f} min from {limit} posts) for user '{user}'...[/bold]")
     start_time = time.time()
 
     longform = not shortform
 
     with get_session() as session:
+        # Get or create user
+        user_obj = get_or_create_user(session, user)
+
         try:
             episode = generate_episode(
                 session=session,
@@ -303,6 +321,7 @@ def generate(
                 sort_by_score=by_engagement,
                 tts_backend=tts,
                 include_covered_posts=include_covered_posts,
+                user=user_obj,
             )
             render_seconds = time.time() - start_time
 

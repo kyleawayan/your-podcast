@@ -8,7 +8,7 @@ from podcastfy.client import generate_podcast
 from rich.console import Console
 from sqlalchemy.orm import Session
 
-from your_podcast.db.models import Episode, Post
+from your_podcast.db.models import Episode, Post, User
 from your_podcast.podcast.chatterbox_tts import generate_audio_chatterbox
 from your_podcast.podcast.google_cloud_tts import generate_audio_google_cloud
 from your_podcast.podcast.macos_tts import generate_audio_macos
@@ -54,6 +54,7 @@ def generate_episode(
     sort_by_score: bool = False,
     tts_backend: str | None = None,
     include_covered_posts: bool = False,
+    user: User | None = None,
 ) -> Episode:
     """
     Generate a podcast episode from fetched Reddit posts.
@@ -71,10 +72,14 @@ def generate_episode(
         sort_by_score: If True, select top posts by engagement (score + comments); otherwise random
         tts_backend: TTS backend to use ("elevenlabs" or "macos"). Defaults to settings.
         include_covered_posts: If True, include posts already covered in previous episodes.
+        user: User to generate episode for. Required.
 
     Returns:
         Episode: Created episode record with paths to generated files
     """
+    if user is None:
+        raise ValueError("User is required for episode generation")
+
     settings = get_settings()
     tts_backend = tts_backend or settings.tts_backend
     # Podcastfy picks up API keys from environment variables automatically
@@ -82,7 +87,8 @@ def generate_episode(
     # Query posts
     query = session.query(Post)
     if not include_covered_posts:
-        query = query.filter(~Post.episodes.any())
+        # Only exclude posts covered by THIS user's episodes
+        query = query.filter(~Post.episodes.any(Episode.user_id == user.id))
 
     if subreddits:
         query = query.filter(Post.subreddit.in_(subreddits))
@@ -200,7 +206,7 @@ def generate_episode(
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        audio_file = str(output_path / f"podcast_{timestamp}.mp3")
+        audio_file = str(output_path / f"podcast_{user.name}_{timestamp}.mp3")
 
         audio_path = generate_audio_macos(
             transcript=transcript_text,
@@ -237,7 +243,7 @@ def generate_episode(
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        audio_file = str(output_path / f"podcast_{timestamp}.mp3")
+        audio_file = str(output_path / f"podcast_{user.name}_{timestamp}.mp3")
 
         audio_path = generate_audio_chatterbox(
             transcript=transcript_text,
@@ -274,7 +280,7 @@ def generate_episode(
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        audio_file = str(output_path / f"podcast_{timestamp}.mp3")
+        audio_file = str(output_path / f"podcast_{user.name}_{timestamp}.mp3")
 
         audio_path = generate_audio_google_cloud(
             transcript=transcript_text,
@@ -293,11 +299,11 @@ def generate_episode(
     # Generate episode title from subreddits
     if subreddits:
         subreddit_list = ", ".join(f"r/{s}" for s in subreddits)
-        title = f"Your Podcast: {subreddit_list}"
+        title = f"Your Podcast ({user.name}): {subreddit_list}"
     else:
         unique_subreddits = list(set(post.subreddit for post in posts))
         subreddit_list = ", ".join(f"r/{s}" for s in unique_subreddits[:3])
-        title = f"Your Podcast: {subreddit_list}"
+        title = f"Your Podcast ({user.name}): {subreddit_list}"
         if len(unique_subreddits) > 3:
             title += f" and {len(unique_subreddits) - 3} more"
 
@@ -308,6 +314,7 @@ def generate_episode(
         transcript_path=transcript_path,
         audio_path=audio_path,
         post_count=len(posts),
+        user=user,
     )
 
     session.add(episode)
