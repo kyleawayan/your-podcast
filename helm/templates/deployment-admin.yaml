@@ -1,0 +1,94 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "your-podcast.fullname" . }}-admin
+  labels:
+    {{- include "your-podcast.labels" . | nindent 4 }}
+    app.kubernetes.io/component: admin
+spec:
+  replicas: {{ .Values.admin.replicas }}
+  selector:
+    matchLabels:
+      {{- include "your-podcast.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: admin
+  template:
+    metadata:
+      labels:
+        {{- include "your-podcast.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: admin
+    spec:
+      initContainers:
+        - name: alembic-migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["alembic"]
+          args: ["upgrade", "head"]
+          envFrom:
+            - secretRef:
+                name: {{ include "your-podcast.fullname" . }}
+          {{- if .Values.gcp.secretName }}
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /etc/gcp/sa-key.json
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            {{- if .Values.gcp.secretName }}
+            - name: gcp-credentials
+              mountPath: /etc/gcp
+              readOnly: true
+            {{- end }}
+      containers:
+        - name: admin
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          command: ["your-podcast"]
+          args: ["admin", "--host", "0.0.0.0", "--port", "{{ .Values.admin.port }}"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.admin.port }}
+              protocol: TCP
+          envFrom:
+            - secretRef:
+                name: {{ include "your-podcast.fullname" . }}
+          {{- if .Values.gcp.secretName }}
+          env:
+            - name: GOOGLE_APPLICATION_CREDENTIALS
+              value: /etc/gcp/sa-key.json
+          {{- end }}
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+            {{- if .Values.gcp.secretName }}
+            - name: gcp-credentials
+              mountPath: /etc/gcp
+              readOnly: true
+            {{- end }}
+          resources:
+            {{- toYaml .Values.admin.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /admin/
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /admin/
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "your-podcast.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        {{- if .Values.gcp.secretName }}
+        - name: gcp-credentials
+          secret:
+            secretName: {{ .Values.gcp.secretName }}
+        {{- end }}

@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Table, Text, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -13,6 +13,15 @@ class Base(DeclarativeBase):
     """Base class for all models."""
 
     pass
+
+
+# Association table for many-to-many Post <-> Episode relationship
+post_episodes = Table(
+    "post_episodes",
+    Base.metadata,
+    Column("post_id", UUID(as_uuid=True), ForeignKey("posts.id"), primary_key=True),
+    Column("episode_id", UUID(as_uuid=True), ForeignKey("episodes.id"), primary_key=True),
+)
 
 
 class Post(Base):
@@ -38,11 +47,26 @@ class Post(Base):
     comments: Mapped[list[dict[str, Any]]] = mapped_column(
         JSONB, default=list, server_default="[]"
     )
-    # Track which episode this post was used in (null = not yet used)
-    episode_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("episodes.id"), nullable=True, index=True
+    # Episodes this post has been used in (many-to-many)
+    episodes: Mapped[list["Episode"]] = relationship(
+        "Episode", secondary=post_episodes, back_populates="posts"
     )
-    episode: Mapped["Episode | None"] = relationship("Episode", back_populates="posts")
+
+
+class User(Base):
+    """A podcast listener/user."""
+
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    )
+    name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    # Episodes generated for this user
+    episodes: Mapped[list["Episode"]] = relationship("Episode", back_populates="user")
 
 
 class Episode(Base):
@@ -62,5 +86,12 @@ class Episode(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
-    # Posts used in this episode
-    posts: Mapped[list["Post"]] = relationship("Post", back_populates="episode")
+    # User who this episode was generated for
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
+    )
+    user: Mapped["User"] = relationship("User", back_populates="episodes")
+    # Posts used in this episode (many-to-many)
+    posts: Mapped[list["Post"]] = relationship(
+        "Post", secondary=post_episodes, back_populates="episodes"
+    )

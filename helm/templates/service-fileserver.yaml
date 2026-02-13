@@ -1,0 +1,19 @@
+{{- if .Values.fileserver.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "your-podcast.fullname" . }}-fileserver
+  labels:
+    {{- include "your-podcast.labels" . | nindent 4 }}
+    app.kubernetes.io/component: fileserver
+spec:
+  type: {{ .Values.fileserver.service.type }}
+  ports:
+    - port: {{ .Values.fileserver.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "your-podcast.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: fileserver
+{{- end }}

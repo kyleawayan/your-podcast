@@ -1,0 +1,83 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "your-podcast.fullname" . }}-overnight
+  labels:
+    {{- include "your-podcast.labels" . | nindent 4 }}
+    app.kubernetes.io/component: overnight
+spec:
+  schedule: {{ .Values.overnightJobs.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: {{ .Values.overnightJobs.successfulJobsHistoryLimit }}
+  failedJobsHistoryLimit: {{ .Values.overnightJobs.failedJobsHistoryLimit }}
+  jobTemplate:
+    spec:
+      backoffLimit: 1
+      template:
+        metadata:
+          labels:
+            {{- include "your-podcast.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: overnight
+        spec:
+          restartPolicy: Never
+          containers:
+            - name: overnight
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              command: ["/bin/sh", "-c"]
+              args:
+                - |
+                  set -e
+                  echo "=== Phase 1: Fetching subreddits ==="
+                  your-podcast fetch {{ join " " .Values.overnightJobs.fetchSubreddits }}
+
+                  echo "=== Phase 2: Generating podcasts ==="
+                  {{- range .Values.overnightJobs.podcasts }}
+                  (
+                    echo "--- Generating for user: {{ .user }} ({{ .duration }}min) ---"
+                    your-podcast generate \
+                      --user {{ .user }} \
+                      --duration {{ .duration }} \
+                      --output /app/data/podcasts \
+                      {{- range .subreddits }}
+                      --subreddit {{ . }} \
+                      {{- end }}
+
+                    echo "--- Done: {{ .user }} ---"
+                  ) &
+                  {{- end }}
+
+                  echo "Waiting for all generate jobs..."
+                  wait
+                  echo "=== All done ==="
+              envFrom:
+                - secretRef:
+                    name: {{ include "your-podcast.fullname" . }}
+              {{- if .Values.gcp.secretName }}
+              env:
+                - name: GOOGLE_APPLICATION_CREDENTIALS
+                  value: /etc/gcp/sa-key.json
+              {{- end }}
+              volumeMounts:
+                - name: data
+                  mountPath: /app/data
+                {{- if .Values.gcp.secretName }}
+                - name: gcp-credentials
+                  mountPath: /etc/gcp
+                  readOnly: true
+                {{- end }}
+              resources:
+                {{- toYaml .Values.overnightJobs.resources | nindent 16 }}
+          volumes:
+            - name: data
+              {{- if .Values.persistence.enabled }}
+              persistentVolumeClaim:
+                claimName: {{ include "your-podcast.fullname" . }}-data
+              {{- else }}
+              emptyDir: {}
+              {{- end }}
+            {{- if .Values.gcp.secretName }}
+            - name: gcp-credentials
+              secret:
+                secretName: {{ .Values.gcp.secretName }}
+            {{- end }}

@@ -1,8 +1,6 @@
 """Podcast episode generator using Podcastfy."""
 
 import random
-
-import os
 from datetime import datetime
 from pathlib import Path
 
@@ -10,9 +8,7 @@ from podcastfy.client import generate_podcast
 from rich.console import Console
 from sqlalchemy.orm import Session
 
-from your_podcast.db.models import Episode, Post
-from your_podcast.podcast.chatterbox_tts import generate_audio_chatterbox
-from your_podcast.podcast.macos_tts import generate_audio_macos
+from your_podcast.db.models import Episode, Post, User
 from your_podcast.reddit.comment_fetcher import format_post_with_comments
 from your_podcast.settings import get_settings
 
@@ -51,9 +47,11 @@ def generate_episode(
     limit: int = 10,
     subreddits: list[str] | None = None,
     output_dir: str = "./data/podcasts",
-    word_count: int = 500,
+    longform: bool = True,
     sort_by_score: bool = False,
     tts_backend: str | None = None,
+    include_covered_posts: bool = False,
+    user: User | None = None,
 ) -> Episode:
     """
     Generate a podcast episode from fetched Reddit posts.
@@ -66,23 +64,28 @@ def generate_episode(
         limit: Maximum number of posts to include in podcast
         subreddits: Optional list of subreddits to filter by
         output_dir: Directory to save audio and transcript files
-        word_count: Target word count for podcast transcript (~150 words = 1 min audio)
+        longform: If True, use longform mode for complete coverage (default).
+                  If False, use shortform mode (faster but may truncate).
         sort_by_score: If True, select top posts by engagement (score + comments); otherwise random
         tts_backend: TTS backend to use ("elevenlabs" or "macos"). Defaults to settings.
+        include_covered_posts: If True, include posts already covered in previous episodes.
+        user: User to generate episode for. Required.
 
     Returns:
         Episode: Created episode record with paths to generated files
     """
+    if user is None:
+        raise ValueError("User is required for episode generation")
+
     settings = get_settings()
     tts_backend = tts_backend or settings.tts_backend
+    # Podcastfy picks up API keys from environment variables automatically
 
-    # Set Podcastfy environment variables
-    os.environ["ANTHROPIC_API_KEY"] = settings.anthropic_api_key
-    if tts_backend == "elevenlabs":
-        os.environ["ELEVENLABS_API_KEY"] = settings.elevenlabs_api_key
-
-    # Query unused posts (not yet in an episode)
-    query = session.query(Post).filter(Post.episode_id.is_(None))
+    # Query posts
+    query = session.query(Post)
+    if not include_covered_posts:
+        # Only exclude posts covered by THIS user's episodes
+        query = query.filter(~Post.episodes.any(Episode.user_id == user.id))
 
     if subreddits:
         query = query.filter(Post.subreddit.in_(subreddits))
@@ -127,11 +130,15 @@ def generate_episode(
     console.print(f"[yellow]Prepared {len(content_parts)} posts for podcast...[/yellow]")
 
     # Configure podcast conversation
+    today = datetime.now()
+    tagline = f"Your personalized podcast just for you, for the day of {today.strftime('%B')} {today.day}, {today.year}"
     conversation_config = {
-        "word_count": word_count,
-        "conversation_style": ["casual", "informative"],
-        "podcast_name": "Reddit Digest",
-        "podcast_tagline": "Your Daily Dose of Reddit",
+        "conversation_style": ["casual", "informative", "enthusiastic"],
+        "podcast_name": "Your Podcast",
+        "podcast_tagline": tagline,
+        "dialogue_structure": ["Introduction", "Main Content Summary", "Conclusion"],
+        "roles_person1": "main host who introduces topics and drives the conversation",
+        "roles_person2": "co-host who adds commentary, asks questions, and provides different perspectives",
     }
 
     if tts_backend == "elevenlabs":
@@ -147,19 +154,18 @@ def generate_episode(
             },
         }
 
-        console.print(
-            f"[yellow]Generating ~{word_count // 150} minute podcast "
-            f"with Podcastfy + ElevenLabs...[/yellow]"
-        )
+        mode_str = "longform" if longform else "shortform"
+        console.print(f"[yellow]Generating podcast with Podcastfy + ElevenLabs ({mode_str})...[/yellow]")
 
         existing_transcripts = _get_existing_transcripts()
 
         audio_path = generate_podcast(
             text=text_input,
             tts_model="elevenlabs",
-            llm_model_name="anthropic/claude-sonnet-4-5",
-            api_key_label="ANTHROPIC_API_KEY",
+            llm_model_name="gemini-2.5-flash",
+            api_key_label="GEMINI_API_KEY",
             conversation_config=conversation_config,
+            longform=longform,
         )
 
         transcript_path = _find_new_transcript(existing_transcripts) or ""
@@ -170,21 +176,20 @@ def generate_episode(
             raise ValueError("Podcast generation failed - no audio file produced")
 
     elif tts_backend == "macos":
-        console.print(
-            f"[yellow]Generating ~{word_count // 150} minute podcast "
-            f"with Podcastfy + macOS voices...[/yellow]"
-        )
+        mode_str = "longform" if longform else "shortform"
+        console.print(f"[yellow]Generating podcast with Podcastfy + macOS voices ({mode_str})...[/yellow]")
 
         existing_transcripts = _get_existing_transcripts()
 
-        # Generate transcript only (no TTS) using Podcastfy + Claude
+        # Generate transcript only (no TTS) using Podcastfy
         generate_podcast(
             text=text_input,
             tts_model="elevenlabs",
-            llm_model_name="anthropic/claude-sonnet-4-5",
-            api_key_label="ANTHROPIC_API_KEY",
+            llm_model_name="gemini-2.5-flash",
+            api_key_label="GEMINI_API_KEY",
             conversation_config=conversation_config,
             transcript_only=True,
+            longform=longform,
         )
 
         transcript_path = _find_new_transcript(existing_transcripts)
@@ -198,7 +203,9 @@ def generate_episode(
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        audio_file = str(output_path / f"podcast_{timestamp}.mp3")
+        audio_file = str(output_path / f"podcast_{user.name}_{timestamp}.mp3")
+
+        from your_podcast.podcast.macos_tts import generate_audio_macos
 
         audio_path = generate_audio_macos(
             transcript=transcript_text,
@@ -208,21 +215,20 @@ def generate_episode(
         )
 
     elif tts_backend == "chatterbox":
-        console.print(
-            f"[yellow]Generating ~{word_count // 150} minute podcast "
-            f"with Podcastfy + Chatterbox-Turbo...[/yellow]"
-        )
+        mode_str = "longform" if longform else "shortform"
+        console.print(f"[yellow]Generating podcast with Podcastfy + Chatterbox ({mode_str})...[/yellow]")
 
         existing_transcripts = _get_existing_transcripts()
 
-        # Generate transcript only (no TTS) using Podcastfy + Claude
+        # Generate transcript only (no TTS) using Podcastfy
         generate_podcast(
             text=text_input,
             tts_model="elevenlabs",
-            llm_model_name="anthropic/claude-sonnet-4-5",
-            api_key_label="ANTHROPIC_API_KEY",
+            llm_model_name="gemini-2.5-flash",
+            api_key_label="GEMINI_API_KEY",
             conversation_config=conversation_config,
             transcript_only=True,
+            longform=longform,
         )
 
         transcript_path = _find_new_transcript(existing_transcripts)
@@ -236,7 +242,9 @@ def generate_episode(
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        audio_file = str(output_path / f"podcast_{timestamp}.mp3")
+        audio_file = str(output_path / f"podcast_{user.name}_{timestamp}.mp3")
+
+        from your_podcast.podcast.chatterbox_tts import generate_audio_chatterbox
 
         audio_path = generate_audio_chatterbox(
             transcript=transcript_text,
@@ -245,8 +253,48 @@ def generate_episode(
             output_path=audio_file,
         )
 
+    elif tts_backend == "google_cloud":
+        mode_str = "longform" if longform else "shortform"
+        console.print(f"[yellow]Generating podcast with Podcastfy + Google Cloud TTS ({mode_str})...[/yellow]")
+
+        existing_transcripts = _get_existing_transcripts()
+
+        # Generate transcript only (no TTS) using Podcastfy
+        generate_podcast(
+            text=text_input,
+            tts_model="elevenlabs",
+            llm_model_name="gemini-2.5-flash",
+            api_key_label="GEMINI_API_KEY",
+            conversation_config=conversation_config,
+            transcript_only=True,
+            longform=longform,
+        )
+
+        transcript_path = _find_new_transcript(existing_transcripts)
+        if not transcript_path:
+            raise ValueError("Podcast generation failed - no transcript file produced")
+
+        # Read the transcript content
+        transcript_text = Path(transcript_path).read_text()
+
+        # Generate audio with Google Cloud TTS
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        audio_file = str(output_path / f"podcast_{user.name}_{timestamp}.mp3")
+
+        from your_podcast.podcast.google_cloud_tts import generate_audio_google_cloud
+
+        audio_path = generate_audio_google_cloud(
+            transcript=transcript_text,
+            voice_1=settings.google_cloud_voice_1,
+            voice_2=settings.google_cloud_voice_2,
+            output_path=audio_file,
+            model=settings.google_cloud_model,
+        )
+
     else:
-        raise ValueError(f"Unknown TTS backend: {tts_backend}. Use 'elevenlabs', 'macos', or 'chatterbox'.")
+        raise ValueError(f"Unknown TTS backend: {tts_backend}. Use 'elevenlabs', 'macos', 'chatterbox', or 'google_cloud'.")
 
     # Resolve audio path to absolute
     audio_path = str(Path(audio_path).resolve())
@@ -254,11 +302,11 @@ def generate_episode(
     # Generate episode title from subreddits
     if subreddits:
         subreddit_list = ", ".join(f"r/{s}" for s in subreddits)
-        title = f"Reddit Digest: {subreddit_list}"
+        title = f"Your Podcast ({user.name}): {subreddit_list}"
     else:
         unique_subreddits = list(set(post.subreddit for post in posts))
         subreddit_list = ", ".join(f"r/{s}" for s in unique_subreddits[:3])
-        title = f"Reddit Digest: {subreddit_list}"
+        title = f"Your Podcast ({user.name}): {subreddit_list}"
         if len(unique_subreddits) > 3:
             title += f" and {len(unique_subreddits) - 3} more"
 
@@ -269,6 +317,7 @@ def generate_episode(
         transcript_path=transcript_path,
         audio_path=audio_path,
         post_count=len(posts),
+        user=user,
     )
 
     session.add(episode)
@@ -276,7 +325,7 @@ def generate_episode(
 
     # Mark posts as used in this episode
     for post in posts:
-        post.episode_id = episode.id
+        post.episodes.append(episode)
 
     session.commit()
     session.refresh(episode)

@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     user_agent: str = "your-podcast:v0.1.0 (JSON reader)"
 
     # Podcast generation with Podcastfy
-    anthropic_api_key: str = ""  # For transcript generation with Claude
+    gemini_api_key: str = ""  # For transcript generation with Gemini
     elevenlabs_api_key: str = ""  # For TTS audio generation
 
     # TTS backend: "elevenlabs" or "macos"
@@ -41,6 +41,13 @@ class Settings(BaseSettings):
     # Place reference audio in ./data/voices/
     chatterbox_voice_1: str = "./data/voices/person1.wav"  # Person1 reference audio
     chatterbox_voice_2: str = "./data/voices/person2.wav"  # Person2 reference audio
+
+    # Google Cloud TTS (Gemini 2.5 Flash TTS)
+    # Uses Application Default Credentials: gcloud auth application-default login
+    # Available speaker IDs: Kore, Charon, Puck, Fenrir, Aoede, Leda, Orus, Zephyr
+    google_cloud_voice_1: str = "Kore"  # Person1 speaker ID
+    google_cloud_voice_2: str = "Charon"  # Person2 speaker ID
+    google_cloud_model: str = "gemini-2.5-flash-preview-tts"
 
 
 @lru_cache

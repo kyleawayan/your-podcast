@@ -1010,11 +1010,11 @@ name = "google-cloud-texttospeech"
 version = "2.34.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
-    { name = "google-api-core", extra = ["grpc"], marker = "python_full_version < '3.13'" },
-    { name = "google-auth", marker = "python_full_version < '3.13'" },
-    { name = "grpcio", marker = "python_full_version < '3.13'" },
-    { name = "proto-plus", marker = "python_full_version < '3.13'" },
-    { name = "protobuf", marker = "python_full_version < '3.13'" },
+    { name = "google-api-core", extra = ["grpc"] },
+    { name = "google-auth" },
+    { name = "grpcio" },
+    { name = "proto-plus" },
+    { name = "protobuf" },
 ]
 sdist = { url = "https://files.pythonhosted.org/packages/e5/2b/cf31829499db007107d6a6777bb92dec8b9cc369aa7e579664c0c530c521/google_cloud_texttospeech-2.34.0.tar.gz", hash = "sha256:65837c3bc728f37290009dbef892df87eae45ad80905559096d1107822074f62", size = 192973, upload-time = "2026-01-15T13:05:09.152Z" }
 wheels = [
@@ -4607,6 +4607,7 @@ dependencies = [
     { name = "chatterbox-tts" },
     { name = "click" },
     { name = "fastapi" },
+    { name = "google-cloud-texttospeech" },
     { name = "playwright" },
     { name = "podcastfy", version = "0.1.13", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.13'" },
     { name = "podcastfy", version = "0.4.3", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.13'" },
@@ -4627,6 +4628,7 @@ requires-dist = [
     { name = "chatterbox-tts", specifier = ">=0.1.6" },
     { name = "click", specifier = ">=8.1.7,<8.2" },
     { name = "fastapi" },
+    { name = "google-cloud-texttospeech", specifier = ">=2.31.0" },
     { name = "playwright", specifier = ">=1.57.0" },
     { name = "podcastfy" },
     { name = "psycopg2-binary" },

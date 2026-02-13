@@ -11,6 +11,7 @@ from your_podcast.podcast.macos_tts import (
     parse_transcript,
 )
 from your_podcast.podcast.chatterbox_tts import generate_audio_chatterbox
+from your_podcast.podcast.google_cloud_tts import generate_audio_google_cloud
 from your_podcast.settings import get_settings
 
 console = Console()
@@ -134,6 +135,34 @@ def test_chatterbox_voices() -> Path | None:
     return output_path
 
 
+def test_google_cloud_voices() -> Path | None:
+    """Generate test audio using Google Cloud Gemini TTS."""
+    settings = get_settings()
+
+    try:
+        from google.cloud import texttospeech
+
+        texttospeech.TextToSpeechClient()  # Test credentials
+    except Exception as e:
+        console.print(f"[yellow]Skipping Google Cloud test - {e}[/yellow]")
+        return None
+
+    transcript = TEST_TRANSCRIPT.read_text()
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    output_path = OUTPUT_DIR / "test_google_cloud.mp3"
+
+    console.print("[bold]Testing Google Cloud Gemini TTS...[/bold]")
+    generate_audio_google_cloud(
+        transcript=transcript,
+        voice_1=settings.google_cloud_voice_1,
+        voice_2=settings.google_cloud_voice_2,
+        output_path=str(output_path),
+        model=settings.google_cloud_model,
+    )
+    return output_path
+
+
 def run_all_tests() -> dict[str, Path | None]:
     """Run all voice tests and return paths to generated files."""
     results: dict[str, Path | None] = {}
@@ -158,5 +187,12 @@ def run_all_tests() -> dict[str, Path | None]:
     except Exception as e:
         console.print(f"[red]Chatterbox test failed:[/red] {e}")
         results["chatterbox"] = None
+
+    # Google Cloud test
+    try:
+        results["google_cloud"] = test_google_cloud_voices()
+    except Exception as e:
+        console.print(f"[red]Google Cloud test failed:[/red] {e}")
+        results["google_cloud"] = None
 
     return results

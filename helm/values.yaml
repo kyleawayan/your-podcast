@@ -1,0 +1,100 @@
+# -- Container image
+image:
+  repository: ghcr.io/kyleawayan/your-podcast
+  tag: latest
+  pullPolicy: IfNotPresent
+
+# -- Secrets (all env vars injected into pods)
+# Override these in a separate values-secret.yaml (gitignored)
+secret:
+  # Database URL is auto-constructed from postgresql.auth values below.
+  # Uncomment to override:
+  # databaseUrl: ""
+  geminiApiKey: ""
+  ttsBackend: "google_cloud"
+  # ElevenLabs
+  elevenlabsApiKey: ""
+  elevenlabsVoice1: "okH1aHncYRU2dc9TP3hV"
+  elevenlabsVoice2: "WIX8boagHAO6uMUqxXLz"
+  # Google Cloud TTS
+  googleCloudVoice1: "Kore"
+  googleCloudVoice2: "Charon"
+  googleCloudModel: "gemini-2.5-flash-preview-tts"
+
+# -- Admin Deployment (FastAPI + SQLAdmin)
+admin:
+  replicas: 1
+  port: 8000
+  service:
+    type: LoadBalancer
+    port: 8000
+  resources:
+    requests:
+      memory: 128Mi
+      cpu: 100m
+    limits:
+      memory: 256Mi
+      cpu: 500m
+
+# -- File server for podcast downloads (npx serve)
+fileserver:
+  enabled: true
+  port: 3000
+  service:
+    type: LoadBalancer
+    port: 3000
+  resources:
+    requests:
+      memory: 64Mi
+      cpu: 50m
+    limits:
+      memory: 128Mi
+      cpu: 200m
+
+# -- Shared PVC for podcast/transcript output
+persistence:
+  enabled: true
+  storageClass: local-path
+  size: 10Gi
+  accessModes:
+    - ReadWriteOnce
+
+# -- Overnight CronJob configuration
+overnightJobs:
+  schedule: "0 11 * * *" # 3:00 AM PST (UTC-8)
+  fetchSubreddits: []
+  podcasts: []
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 200m
+    limits:
+      memory: 512Mi
+      cpu: "1"
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+
+# -- GCP service account Secret (user-managed, not Helm-managed)
+# Created by deploy.sh: kubectl create secret generic gcp-credentials --from-file=sa-key.json=<path>
+gcp:
+  secretName: gcp-credentials
+
+# -- Bitnami PostgreSQL subchart
+postgresql:
+  enabled: true
+  auth:
+    username: your_podcast
+    password: your_podcast
+    database: your_podcast
+  primary:
+    persistence:
+      enabled: true
+      storageClass: local-path
+      size: 5Gi
+    resources:
+      requests:
+        memory: 128Mi
+        cpu: 100m
+      limits:
+        memory: 256Mi
+        cpu: 500m

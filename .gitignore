@@ -23,3 +23,8 @@ Thumbs.db
 
 # Data folder
 data/
+data
+
+# Helm
+helm/values-secret.yaml
+helm/charts/

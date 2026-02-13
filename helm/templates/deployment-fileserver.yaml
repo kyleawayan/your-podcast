@@ -1,0 +1,63 @@
+{{- if .Values.fileserver.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "your-podcast.fullname" . }}-fileserver
+  labels:
+    {{- include "your-podcast.labels" . | nindent 4 }}
+    app.kubernetes.io/component: fileserver
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "your-podcast.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: fileserver
+  template:
+    metadata:
+      labels:
+        {{- include "your-podcast.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: fileserver
+    spec:
+      initContainers:
+        - name: ensure-dirs
+          image: node:22-slim
+          command: ["mkdir", "-p", "/app/data/podcasts"]
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+      containers:
+        - name: serve
+          image: node:22-slim
+          command: ["npx"]
+          args: ["serve", "/app/data/podcasts", "--listen", "tcp://0.0.0.0:{{ .Values.fileserver.port }}", "--cors"]
+          ports:
+            - name: http
+              containerPort: {{ .Values.fileserver.port }}
+              protocol: TCP
+          volumeMounts:
+            - name: data
+              mountPath: /app/data
+              readOnly: true
+          resources:
+            {{- toYaml .Values.fileserver.resources | nindent 12 }}
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 30
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+      volumes:
+        - name: data
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "your-podcast.fullname" . }}-data
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+{{- end }}

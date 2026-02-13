@@ -11,7 +11,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn
 
 from your_podcast.db.session import get_session
 
-LOG_FILE = Path(__file__).parent.parent.parent.parent / "generation_log.csv"
+LOG_FILE = Path("generation_log.csv")
 
 from your_podcast.podcast.generator import generate_episode
 
@@ -41,12 +41,31 @@ def get_git_info() -> tuple[str, bool]:
         return "unknown", False
 
 
+def get_audio_duration(audio_path: str) -> float | None:
+    """Get audio duration in seconds using afinfo (macOS)."""
+    try:
+        result = subprocess.run(
+            ["afinfo", audio_path],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        for line in result.stdout.splitlines():
+            if "estimated duration" in line:
+                # Format: "estimated duration: 599.248980 sec"
+                return float(line.split(":")[1].strip().split()[0])
+    except Exception:
+        pass
+    return None
+
+
 def log_generation(
     post_count: int,
-    word_count: int,
     render_seconds: float,
     llm_model: str,
     tts_model: str,
+    longform: bool,
+    duration_seconds: float | None = None,
 ) -> None:
     """Append generation stats to the log file."""
     commit, dirty = get_git_info()
@@ -54,10 +73,12 @@ def log_generation(
         "commit_hash": commit,
         "dirty": dirty,
         "post_count": post_count,
-        "word_count": word_count,
+        "word_count": -1,  # Deprecated, kept for CSV compatibility
         "llm_model": llm_model,
         "tts_model": tts_model,
         "render_seconds": round(render_seconds, 1),
+        "longform": longform,
+        "duration_seconds": round(duration_seconds, 1) if duration_seconds else "",
     }
 
     file_exists = LOG_FILE.exists()
@@ -85,11 +106,22 @@ def fetch(
     time_filter: str = typer.Option(
         "day", "--time", "-t", help="Time filter for top posts (hour, day, week, month, year, all)"
     ),
-    limit: int = typer.Option(25, "--limit", "-l", help="Posts per subreddit (max 100)"),
+    limit: int = typer.Option(100, "--limit", "-l", help="Posts per subreddit (max 100)"),
     comment_limit: int = typer.Option(10, "--comments", "-c", help="Comments per post"),
 ) -> None:
     """Fetch posts and comments from Reddit subreddits via JSON API."""
-    console.print(f"[bold]Fetching from {len(subreddits)} subreddit(s)...[/bold]")
+    # Estimate max time (assumes all posts are new - actual time may be less)
+    max_posts = len(subreddits) * limit
+    estimated_seconds = max_posts * 6  # 6 seconds per request (10 QPM rate limit)
+    hours, remainder = divmod(int(estimated_seconds), 3600)
+    minutes, seconds = divmod(remainder, 60)
+    if hours > 0:
+        eta_str = f"~{hours}h {minutes}m max"
+    elif minutes > 0:
+        eta_str = f"~{minutes}m {seconds}s max"
+    else:
+        eta_str = f"~{seconds}s max"
+    console.print(f"[bold]Fetching from {len(subreddits)} subreddit(s)...[/bold] ({eta_str})")
 
     total_posts = 0
     total_comments = 0
@@ -172,12 +204,12 @@ def clear(
                     console.print("Cancelled.")
                     raise typer.Exit(0)
 
-            # Unlink posts from episodes before deleting episodes
-            if not (all or posts):  # Skip if posts were already deleted above
-                posts_count = session.query(Post).filter(Post.episode_id.isnot(None)).count()
-                if posts_count > 0:
-                    session.query(Post).filter(Post.episode_id.isnot(None)).update({Post.episode_id: None})
-                    console.print(f"[green]Unlinked {posts_count} posts from episodes[/green]")
+            # Clear post-episode associations before deleting episodes
+            from your_podcast.db.models import post_episodes
+
+            result = session.execute(post_episodes.delete())
+            if result.rowcount > 0:
+                console.print(f"[green]Cleared {result.rowcount} post-episode associations[/green]")
 
             session.query(Episode).delete()
             console.print(f"[green]Deleted {count} episodes[/green]")
@@ -200,17 +232,35 @@ def admin(
     uvicorn.run(app, host=host, port=port)
 
 
+# Duration estimates per post (based on historical data)
+SECONDS_PER_POST_LONGFORM = 180  # ~3 min/post in longform mode
+SECONDS_PER_POST_SHORTFORM = 50  # ~50 sec/post in shortform mode
+
+
+def get_or_create_user(session, name: str):
+    """Get user by name, creating if it doesn't exist."""
+    from your_podcast.db.models import User
+
+    user = session.query(User).filter(User.name == name).first()
+    if not user:
+        user = User(name=name)
+        session.add(user)
+        session.flush()  # Get the ID without committing
+    return user
+
+
 @app.command()
 def generate(
-    limit: int = typer.Option(10, "--limit", "-l", help="Number of posts to include"),
+    limit: int = typer.Option(None, "--limit", "-l", help="Number of posts to include"),
+    duration: int = typer.Option(None, "--duration", "-d", help="Target duration in minutes"),
     subreddits: list[str] = typer.Option(
         None, "--subreddit", "-s", help="Filter by specific subreddits"
     ),
     output_dir: str = typer.Option(
         "./data/podcasts", "--output", "-o", help="Output directory for podcast files"
     ),
-    word_count: int = typer.Option(
-        500, "--words", "-w", help="Target word count (~150 words = 1 min audio)"
+    shortform: bool = typer.Option(
+        False, "--shortform", help="Shorter podcast (2-5 min); may truncate with many posts"
     ),
     by_engagement: bool = typer.Option(
         False, "--by-engagement", help="Select top posts by engagement (score + comments)"
@@ -218,36 +268,75 @@ def generate(
     tts: str = typer.Option(
         None, "--tts", help="TTS backend: 'elevenlabs' or 'macos' (default from settings)"
     ),
+    include_covered_posts: bool = typer.Option(
+        False, "--include-covered-posts", help="Include posts already covered in previous episodes"
+    ),
+    user: str = typer.Option(
+        "global", "--user", "-u", help="User name for this episode (for tracking covered posts)"
+    ),
 ) -> None:
     """Generate a podcast episode from fetched Reddit posts.
 
     Selects unused posts (random by default, or top by engagement with --by-engagement)
     and generates a podcast with Podcastfy. Posts are marked as used after generation.
 
-    Default is ~3.5 minutes. Use --words 750 for ~5 minutes.
+    Specify either --limit (number of posts) or --duration (target minutes), not both.
+    Default: 5 posts (~15 minutes).
+
+    Uses longform mode by default for complete coverage of all posts.
+    Use --shortform for faster generation (may truncate with many posts).
 
     Use --tts macos to use free macOS Premium/Siri voices instead of ElevenLabs.
     """
-    console.print("[bold]Generating podcast episode...[/bold]")
+    # Validate mutually exclusive options
+    if limit is not None and duration is not None:
+        console.print("[red]Error:[/red] Specify either --limit or --duration, not both")
+        raise typer.Exit(1)
+
+    # Calculate post limit from duration or use default
+    if duration is not None:
+        limit = max(1, round(duration * 60 / SECONDS_PER_POST_LONGFORM))
+        estimated_duration = limit * SECONDS_PER_POST_LONGFORM / 60
+        console.print(f"[bold]Target: {duration} min → using {limit} posts (est. ~{estimated_duration:.0f} min)[/bold]")
+    elif limit is None:
+        limit = 5  # Default
+
+    estimated_duration = limit * SECONDS_PER_POST_LONGFORM / 60
+    console.print(f"[bold]Generating podcast episode (~{estimated_duration:.0f} min from {limit} posts) for user '{user}'...[/bold]")
     start_time = time.time()
 
+    longform = not shortform
+
     with get_session() as session:
+        # Get or create user
+        user_obj = get_or_create_user(session, user)
+
         try:
             episode = generate_episode(
                 session=session,
                 limit=limit,
                 subreddits=subreddits,
                 output_dir=output_dir,
-                word_count=word_count,
+                longform=longform,
                 sort_by_score=by_engagement,
                 tts_backend=tts,
+                include_covered_posts=include_covered_posts,
+                user=user_obj,
             )
             render_seconds = time.time() - start_time
+
+            # Get actual audio duration and save to database
+            duration_seconds = get_audio_duration(episode.audio_path)
+            if duration_seconds:
+                episode.duration_seconds = int(duration_seconds)
+                session.commit()
+            duration_str = f"{duration_seconds / 60:.1f} min" if duration_seconds else "unknown"
 
             console.print(f"\n[green]Success![/green] Podcast episode generated:")
             console.print(f"  Title: {episode.title}")
             console.print(f"  Description: {episode.description}")
             console.print(f"  Posts: {episode.post_count}")
+            console.print(f"  Duration: {duration_str}")
             console.print(f"  Transcript: {episode.transcript_path}")
             console.print(f"  Audio: {episode.audio_path}")
             console.print(f"  Render time: {render_seconds:.1f}s")
@@ -262,10 +351,11 @@ def generate(
             }
             log_generation(
                 post_count=episode.post_count,
-                word_count=word_count,
                 render_seconds=render_seconds,
-                llm_model="claude-sonnet-4-5",
+                llm_model="gemini-2.5-flash",
                 tts_model=tts_model_map.get(effective_tts, effective_tts),
+                longform=longform,
+                duration_seconds=duration_seconds,
             )
 
         except ValueError as e:

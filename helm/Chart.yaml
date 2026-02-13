@@ -1,0 +1,12 @@
+apiVersion: v2
+name: your-podcast
+description: Personal podcast generator from Reddit content
+version: 0.1.0
+appVersion: "0.1.0"
+type: application
+
+dependencies:
+  - name: postgresql
+    version: "18.1.13"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
