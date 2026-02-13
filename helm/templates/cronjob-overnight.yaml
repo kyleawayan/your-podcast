@@ -33,22 +33,17 @@ spec:
 
                   echo "=== Phase 2: Generating podcasts ==="
                   {{- range .Values.overnightJobs.podcasts }}
-                  (
-                    echo "--- Generating for user: {{ .user }} ({{ .duration }}min) ---"
-                    your-podcast generate \
-                      --user {{ .user }} \
-                      --duration {{ .duration }} \
-                      --output /app/data/podcasts \
-                      {{- range .subreddits }}
-                      --subreddit {{ . }} \
-                      {{- end }}
+                  echo "--- Generating for user: {{ .user }} ({{ .duration }}min) ---"
+                  your-podcast generate \
+                    --user {{ .user }} \
+                    --duration {{ .duration }} \
+                    --output /app/data/podcasts \
+                    {{- range .subreddits }}
+                    --subreddit {{ . }} \
+                    {{- end }}
 
-                    echo "--- Done: {{ .user }} ---"
-                  ) &
+                  echo "--- Done: {{ .user }} ---"
                   {{- end }}
-
-                  echo "Waiting for all generate jobs..."
-                  wait
                   echo "=== All done ==="
               envFrom:
                 - secretRef:
