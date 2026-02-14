@@ -69,7 +69,7 @@ overnightJobs:
       memory: 256Mi
       cpu: 200m
     limits:
-      memory: 512Mi
+      memory: 4Gi
       cpu: "1"
   successfulJobsHistoryLimit: 3
   failedJobsHistoryLimit: 3
