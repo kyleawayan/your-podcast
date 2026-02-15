@@ -36,7 +36,7 @@ admin:
       memory: 256Mi
       cpu: 500m
 
-# -- File server for podcast downloads (npx serve)
+# -- File server for podcast downloads (Caddy)
 fileserver:
   enabled: true
   port: 3000

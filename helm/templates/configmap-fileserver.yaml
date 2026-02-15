@@ -1,0 +1,16 @@
+{{- if .Values.fileserver.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "your-podcast.fullname" . }}-caddyfile
+  labels:
+    {{- include "your-podcast.labels" . | nindent 4 }}
+    app.kubernetes.io/component: fileserver
+data:
+  Caddyfile: |
+    :{{ .Values.fileserver.port }} {
+      root * /app/data/podcasts
+      file_server browse
+      header Access-Control-Allow-Origin *
+    }
+{{- end }}

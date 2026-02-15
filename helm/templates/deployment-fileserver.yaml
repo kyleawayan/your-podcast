@@ -20,16 +20,15 @@ spec:
     spec:
       initContainers:
         - name: ensure-dirs
-          image: node:22-slim
+          image: busybox:1.37
           command: ["mkdir", "-p", "/app/data/podcasts"]
           volumeMounts:
             - name: data
               mountPath: /app/data
       containers:
-        - name: serve
-          image: node:22-slim
-          command: ["npx"]
-          args: ["serve", "/app/data/podcasts", "--listen", "tcp://0.0.0.0:{{ .Values.fileserver.port }}", "--cors"]
+        - name: caddy
+          image: caddy:2-alpine
+          command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
           ports:
             - name: http
               containerPort: {{ .Values.fileserver.port }}
@@ -37,6 +36,10 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /app/data
+              readOnly: true
+            - name: caddyfile
+              mountPath: /etc/caddy/Caddyfile
+              subPath: Caddyfile
               readOnly: true
           resources:
             {{- toYaml .Values.fileserver.resources | nindent 12 }}
@@ -60,4 +63,7 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        - name: caddyfile
+          configMap:
+            name: {{ include "your-podcast.fullname" . }}-caddyfile
 {{- end }}
